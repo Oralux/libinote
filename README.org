@@ -1,0 +1,5 @@
+The libinote library preprocesses a text aimed to a text-to-speech engine:
+- input: raw text or enriched with SSML tags or ECI annotations,
+- output: type-length-value format.
+
+
