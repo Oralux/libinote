@@ -3,33 +3,98 @@
 
 #include <stdint.h>
 
+typedef enum {
+  INOTE_CHARSET_UNDEFINED = 0,
+  INOTE_CHARSET_ISO_8859_1,
+  INOTE_CHARSET_GBK,
+  INOTE_CHARSET_UCS_2,
+  INOTE_CHARSET_BIG_5,
+  INOTE_CHARSET_SJIS,
+  INOTE_CHARSET_UTF_8,
+  INOTE_CHARSET_UTF_16,
+  INOTE_CHARSET_WCHAR_T,
+} inote_charset_t;
 
-struct input_t {
-  char *text; // utf-8 text (raw or enriched with SSML tags or ECI annotations)
-  uint32_t index; // index in the text buffer of the first byte to process
-  uint32_t max_size; // max size in bytes of the text buffer
-};
 
-struct state_t {
-  uint32_t punctuation_mode; // '0'=none, '1'=all or '2'=some
-  uint32_t spelling_enabled; // 1 = spelling command already set
+typedef enum {
+  INOTE_TYPE_TEXT=1,
+  INOTE_TYPE_PUNCTUATION=2,
+  INOTE_TYPE_ANNOTATION=4,
+} inote_type_t;
+
+typedef enum {
+  INOTE_PUNCT_MODE_NONE=0, // does not pronounce punctuation
+  INOTE_PUNCT_MODE_ALL=1, // pronounce all punctuation character
+  INOTE_PUNCT_MODE_SOME=2, // pronounce any punctuation character in the punctuation list
+  INOTE_PUNCT_FOUND=8 // a punctuation character has been found
+} inote_punct_t;
+
+// inote_tlv_t
+//
+// type, length, value
+// type: value from inote_type_t + optional info
+// If text
+// type = charset<<4 + INOTE_TYPE_TEXT
+// Example: 0x21 = iso-8859-1 text
+//
+// if punctuation
+// type = mode<<4 + INOTE_TYPE_PUNCTUATION
+// with mode=none, all, some, found (see inote_punct_t)
+// if mode=some, value=<punctuation list in ascii>
+// if mode=found, value=<found ascii punctuation character>
+//
+// if annotation
+// type = INOTE_TYPE_ANNOTATION
+//
+typedef struct {
+  uint8_t type;
+  uint8_t length;
+  char value[0];
+} inote_tlv_t;
+
+typedef struct {
+  uint8_t *buffer; 
+  size_t length; // data length in bytes
+  inote_charset_t charset;
+  size_t max_size; // allocated buffer size
+} inote_slice_t;
+  
+typedef struct {
+  inote_punct_t punctuation;
+  uint32_t spelling; // 1 = spelling command already set
   uint32_t lang; // 0=unknown, otherwise probable language
   uint32_t *expected_lang; // array of the expected languages
   uint32_t max_expected_lang; // max number of elements of expected_lang
-  uint32_t ssml_enabled; // 1 = SSML tags must be interpreted; 0 = no interpretation
-};
+  uint32_t ssml; // 1 = SSML tags must be interpreted; 0 = no interpretation
+  uint32_t annotation; // 1 = annotations must be interpreted; 0 = no interpretation
+} inote_state_t;
 
-struct output_t {
-  uint8_t *buffer; // type-length-value buffer
-  uint32_t length; // real length in bytes of the buffer
-  uint32_t max_size; // max allocated size in bytes of the buffer
-};
+void *inote_create();
 
-// input: utf-8 text 
-// state: punctuation mode, current language,...
-// output: 
-// RETURN: 0 if no error
-// 
-uint32_t inote_get_annotated_text(struct input_t *input, struct state_t *state, struct output_t *output);
+void inote_delete(void *handle);
+
+/*
+  text: null terminated text (raw or enriched with SSML tags or ECI annotations)
+  text->length does not count the terminator
+  if text->charset defines multibytes sequence, text-buffer must complete sequences
+  state: punctuation, current language,...
+  tlv: type_length_value formated data; text sections encoded in the indicated charset
+  text_offset: first byte not consumed in text->buffer 
+  RETURN: 0 if no error
+  
+  Example
+  input: text="`Pf2()? <speak>Un&nbsp;éléphant,"  
+  output:
+  
+  |-------------------+--------+---------------|
+  | Type              | Length | Value         |
+  |-------------------+--------+---------------|
+  | some punctuation  |      3 | "()?"         |
+  | utf8 text         |     11 | "Un éléphant" |
+  | found punctuation |      1 | ","           |
+  |-------------------+--------+---------------|
+
+*/
+  uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv, size_t *text_offset);
 
 #endif
