@@ -31,26 +31,35 @@ typedef enum {
 
 // inote_tlv_t
 //
-// type, length, value
-// type: value from inote_type_t + optional info
-// If text
-// type = charset<<4 + INOTE_TYPE_TEXT
-// Example: 0x21 = iso-8859-1 text
+// type, length, value description
+// with 
+// - type: value from type1 (see inote_type_t) + type2 (optional info)
+// - length: length2<<8 + length1
+// - value: array of length bytes
 //
-// if punctuation
-// type = mode<<4 + INOTE_TYPE_PUNCTUATION
-// with mode=none, all, some, found (see inote_punct_t)
-// if mode=some, value=<punctuation list in ascii>
-// if mode=found, value=<found ascii punctuation character>
+// Text
+// type1 = INOTE_TYPE_TEXT
+// type2 = charset
 //
-// if annotation
-// type = INOTE_TYPE_ANNOTATION
+// Punctuation
+// type1 = TYPE_PUNCTUATION
+// - type2 = mode (see inote_punct_t)
+//   if mode=some, value=<punctuation list in ascii>
+//
+// - type2 = ascii punctuation char
+//   and length = 0
+//
+// Annotation
+// type1 = INOTE_TYPE_ANNOTATION
 //
 typedef struct {
-  uint8_t type;
-  uint8_t length;
+  uint8_t type1;
+  uint8_t type2;
+  uint8_t length1;
+  uint8_t length2;
   char value[0];
 } inote_tlv_t;
+#define MAX_TLV_LENGTH (2<<16)
 
 typedef struct {
   uint8_t *buffer; 
@@ -74,12 +83,17 @@ void *inote_create();
 void inote_delete(void *handle);
 
 /*
-  text: null terminated text (raw or enriched with SSML tags or ECI annotations)
+  text: null terminated text (raw or enriched with SSML tags or ECI
+  annotations)
   text->length does not count the terminator
-  if text->charset defines multibytes sequence, text-buffer must complete sequences
+  if text->charset defines multibytes sequences, then text-buffer must
+  supply complete sequences
+
   state: punctuation, current language,...
-  tlv: type_length_value formated data; text sections encoded in the indicated charset
-  text_offset: first byte not consumed in text->buffer 
+
+  tlv: type_length_value formated data; text sections encoded in the
+  indicated charset
+  text_offset: the first not yet consumed byte in text->buffer 
   RETURN: 0 if no error
   
   Example
@@ -91,10 +105,10 @@ void inote_delete(void *handle);
   |-------------------+--------+---------------|
   | some punctuation  |      3 | "()?"         |
   | utf8 text         |     11 | "Un éléphant" |
-  | found punctuation |      1 | ","           |
+  | punctuation=","   |      0 |               |
   |-------------------+--------+---------------|
 
 */
-  uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv, size_t *text_offset);
+  uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message, size_t *text_offset);
 
 #endif

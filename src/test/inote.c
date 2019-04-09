@@ -4,7 +4,7 @@
 #include "inote.h"
 
 
-#define BUFFER_SIZE (4*1024)
+#define BUFFER_SIZE (2*MAX_TLV_LENGTH)
 #define MAX_LANG 2
 
 enum {
@@ -16,7 +16,7 @@ enum {
 int main(int argc, char **argv)
 {
   inote_slice_t text;
-  inote_slice_t type_length_value;
+  inote_slice_t tlv_message;
   inote_state_t state;  
   size_t text_offset = 0;
   
@@ -24,7 +24,7 @@ int main(int argc, char **argv)
     return 1;
 
   memset(&text, 0, sizeof(text));
-  memset(&type_length_value, 0, sizeof(type_length_value));
+  memset(&tlv_message, 0, sizeof(tlv_message));
   memset(&state, 0, sizeof(state));
   
   text.buffer = calloc(1, BUFFER_SIZE);
@@ -42,12 +42,12 @@ int main(int argc, char **argv)
   state.max_expected_lang = MAX_LANG;
   state.ssml = 1;
     
-  type_length_value.buffer = calloc(1, BUFFER_SIZE);
-  type_length_value.max_size = BUFFER_SIZE;
-  type_length_value.charset = INOTE_CHARSET_UTF_8;
+  tlv_message.buffer = calloc(1, BUFFER_SIZE);
+  tlv_message.max_size = BUFFER_SIZE;
+  tlv_message.charset = INOTE_CHARSET_UTF_8;
 
   void *handle = inote_create();
-  inote_get_annotated_text(handle, &text, &state, &type_length_value, &text_offset);  
-  printf("type_length_value: %d %d\n", type_length_value.buffer[0], type_length_value.buffer[1]);
+  inote_get_annotated_text(handle, &text, &state, &tlv_message, &text_offset);  
+  printf("tlv_message: %d %d\n", tlv_message.buffer[0], tlv_message.buffer[1]);
   inote_delete(handle);
 }
