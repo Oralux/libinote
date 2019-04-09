@@ -17,6 +17,7 @@ typedef enum {
 
 
 typedef enum {
+  INOTE_TYPE_UNDEFINED=0,
   INOTE_TYPE_TEXT=1,
   INOTE_TYPE_PUNCTUATION=2,
   INOTE_TYPE_ANNOTATION=4,
@@ -26,8 +27,7 @@ typedef enum {
   INOTE_PUNCT_MODE_NONE=0, // does not pronounce punctuation
   INOTE_PUNCT_MODE_ALL=1, // pronounce all punctuation character
   INOTE_PUNCT_MODE_SOME=2, // pronounce any punctuation character in the punctuation list
-  INOTE_PUNCT_FOUND=8 // a punctuation character has been found
-} inote_punct_t;
+} inote_punct_mode_t;
 
 // inote_tlv_t
 //
@@ -69,13 +69,14 @@ typedef struct {
 } inote_slice_t;
   
 typedef struct {
-  inote_punct_t punctuation;
+  inote_punct_mode_t punct_mode;
   uint32_t spelling; // 1 = spelling command already set
   uint32_t lang; // 0=unknown, otherwise probable language
   uint32_t *expected_lang; // array of the expected languages
   uint32_t max_expected_lang; // max number of elements of expected_lang
   uint32_t ssml; // 1 = SSML tags must be interpreted; 0 = no interpretation
   uint32_t annotation; // 1 = annotations must be interpreted; 0 = no interpretation
+  uint32_t entity; // 1 = xml entities must be interpreted; 0 = no interpretation
 } inote_state_t;
 
 void *inote_create();

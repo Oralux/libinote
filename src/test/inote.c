@@ -34,7 +34,7 @@ int main(int argc, char **argv)
   text.charset = INOTE_CHARSET_UTF_8;
   text.max_size = BUFFER_SIZE;
 
-  state.punctuation = INOTE_PUNCT_MODE_ALL;
+  state.punct_mode = INOTE_PUNCT_MODE_ALL;
   state.spelling = 0;
   state.expected_lang = calloc(MAX_LANG, sizeof(*state.expected_lang));
   state.expected_lang[0] = ENGLISH;
