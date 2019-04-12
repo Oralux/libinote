@@ -1,3 +1,8 @@
+/* --> fileno */
+#define _POSIX_C_SOURCE 1
+#include <stdio.h>
+/* <-- */
+
 #include <stdlib.h>
 #include "debug.h"
 #include <string.h>
@@ -52,8 +57,7 @@ void DebugDump(const char *label, uint8_t *buf, size_t size)
     return;
   
   memset(line ,0, sizeof(line));
-  fprintf(myDebugFile, "\n-------------------\n");
-  fprintf(myDebugFile, "\nDump %s", label);
+  fprintf(myDebugFile, "%s", label);
 
   for (i=0; i<size; i++) {
     if (!(i%16)) {
@@ -90,14 +94,14 @@ void DebugFileInit()
   if (snprintf(filename, MAX_FILENAME, LIBINOTELOG, getpid()) >= MAX_FILENAME)
     goto exit0;
 
-  // the debug file must be read by the user only
+  /* the debug file must be read by the user only */
   unlink(filename);
   old_mask = umask(0077);
   myDebugFile = fopen(filename, "w");
   umask(old_mask);
   if (!myDebugFile)
     goto exit0;
-  
+
   if (fstat(fileno(myDebugFile), &buf) || buf.st_mode & 0077) {
 	err("mode=%o", buf.st_mode);
 	fclose(myDebugFile);

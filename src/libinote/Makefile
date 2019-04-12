@@ -1,6 +1,6 @@
 LIB = libinote.a
 BIN = lib.o debug.o 
-CFLAGS += $(DEBUG) -I. -I../api
+CFLAGS += $(DEBUG) -I. -I../api -Wall -std=c99 -pedantic
 CC = gcc
 DESTDIR ?= ../../build/x86_64/usr/
 

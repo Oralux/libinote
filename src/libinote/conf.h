@@ -5,4 +5,4 @@
 #define VERMIN 1
 #define VERMIC 0
 
-#endif // _CONF_H
+#endif

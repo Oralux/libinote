@@ -8,10 +8,10 @@ extern "C" {
 #include <stdint.h>
 #include <stdio.h>
 
-  // log enabled if this file exits
+  /* log enabled if this file exits */
 #define ENABLE_LOG "/tmp/libinote.ok"
 
-  // log level; first byte equals to a digit in DebugLevel (default 
+  /* log level; first byte equals to a digit in DebugLevel (default  */
 #define LIBINOTELOG "/tmp/libinote.log.%d"
 
   enum DebugLevel {LV_ERROR_LEVEL=0, LV_INFO_LEVEL=1, LV_DEBUG_LEVEL=2, LV_LOG_DEFAULT=LV_ERROR_LEVEL};
@@ -21,11 +21,16 @@ extern "C" {
 #define msg(fmt,...) log(LV_INFO_LEVEL, fmt, ##__VA_ARGS__)
 #define dbg(fmt,...) log(LV_DEBUG_LEVEL, fmt, ##__VA_ARGS__)
 
-#define ENTER() dbg("ENTER")
-#define LEAVE() dbg("LEAVE")
+#define err1(a) err("%s",a)
+#define msg1(a) msg("%s",a)
+#define dbg1(a) dbg("%s",a)
 
-  // compilation error if condition is not fullfilled (inspired from
-  // BUILD_BUG_ON, linux kernel).
+  
+#define ENTER() dbg1("ENTER")
+#define LEAVE() dbg1("LEAVE")
+
+  /* compilation error if condition is not fullfilled (inspired from */
+  /* BUILD_BUG_ON, linux kernel). */
 #define BUILD_ASSERT(condition) ((void)sizeof(char[(condition)?1:-1]))
 
   extern int DebugEnabled(enum DebugLevel level);

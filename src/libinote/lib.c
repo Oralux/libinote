@@ -40,7 +40,8 @@ typedef struct {
 
 #define TLV_IS_TEXT(header) (header && (header->type1 == INOTE_TYPE_TEXT))
 #define TLV_SET_TEXT(header, charset) if (header) { header->type1 = INOTE_TYPE_TEXT; header->type2 = charset;}
-static inline void TLV_ADD_LENGTH(inote_tlv_t *header, uint16_t length) {
+
+static void TLV_ADD_LENGTH(inote_tlv_t *header, uint16_t length) {
   if (header) {
 	uint16_t len = length + header->length1 + ((header->length2)<<8);
 	header->length1 = (len & 0xff);
@@ -48,7 +49,7 @@ static inline void TLV_ADD_LENGTH(inote_tlv_t *header, uint16_t length) {
   }
 }
 
-static inline uint32_t get_charset(iconv_t *cd, const char *tocode, const char *fromcode) {
+static uint32_t get_charset(iconv_t *cd, const char *tocode, const char *fromcode) {
   uint32_t ret = 0;
   if (!cd)
 	return EINVAL;
@@ -64,27 +65,26 @@ static inline uint32_t get_charset(iconv_t *cd, const char *tocode, const char *
   return ret;
 }
 
-static inline uint32_t check_slice(const inote_slice_t *s) {
+static uint32_t check_slice(const inote_slice_t *s) {
   return (s && s->buffer
 		  && s->max_size && (s->length <= s->max_size)
 		  && (s->charset > INOTE_CHARSET_UNDEFINED) && (s->charset < MAX_CHARSET));
 }
 
-static inline size_t min_size(size_t a, size_t b) {
+static size_t min_size(size_t a, size_t b) {
   return (a<b) ? a : b;
 }
 
-static inline uint32_t tlv_new(inote_slice_t *tlv_message, inote_type_t type1, uint8_t type2, inote_tlv_t **header, uint16_t *header_length) {
+static uint32_t tlv_new(inote_slice_t *tlv_message, inote_type_t type1, uint8_t type2, inote_tlv_t **header) {
   uint32_t status = EINVAL;
 
   if (tlv_message
 	  && (tlv_message->length + sizeof(*header) <= tlv_message->max_size)
-	  && header && header_length) {
+	  && header) {
 	*header = (inote_tlv_t *)(tlv_message->buffer + tlv_message->length);
 	(*header)->type1 = type1;
 	(*header)->type2 = type2;
 	(*header)->length1 = (*header)->length2 = 0;
-	*header_length = 0;
 	tlv_message->length += sizeof(inote_tlv_t);
 	status = 0;
   }
@@ -92,125 +92,205 @@ static inline uint32_t tlv_new(inote_slice_t *tlv_message, inote_type_t type1, u
   return status;
 }
 
-static uint32_t push_text(handle_t *h, inote_slice_t *text, inote_slice_t *tlv_message, inote_tlv_t **tlv_last) {
-  size_t len;
-  char *inbuf;
-  size_t inbytesleft = 0;
+static uint32_t push_text(handle_t *h, inote_slice_t *segment, inote_state_t *state, inote_slice_t *tlv_message, inote_tlv_t **tlv_last) {
   char *outbuf;
   size_t outbytesleft, max_outbytesleft = 0;
   int ret = 0;
   int err = 0;
   inote_tlv_t *header;
-  uint16_t header_length;
-
-  if (!h || !check_slice(text) || !check_slice(tlv_message) || !tlv_last ) {
-	dbg("EINVAL");
+  wchar_t *t;
+  wchar_t *tmax;
+  
+  if (!h || !check_slice(segment) || !check_slice(tlv_message) || !tlv_last ) {
+	dbg1("EINVAL");
 	return EINVAL;
   }
 
   header = *tlv_last;
   if (!header || (header->type1 != INOTE_TYPE_TEXT)) {
-	tlv_new(tlv_message, INOTE_TYPE_TEXT, tlv_message->charset, &header, &header_length);
+	tlv_new(tlv_message, INOTE_TYPE_TEXT, tlv_message->charset, &header);
 	*tlv_last = header;
   }
   if (!header) {
-	dbg("out of tlv");
+	dbg1("out of tlv");
 	return ENOMEM;
   }  
-  
+
+  /* collect the full text segment   */
+  t = (wchar_t *)(segment->buffer);
+  tmax = (wchar_t *)(segment->buffer + segment->max_size);
+
+  while ((t < tmax) && !iswpunct(*t)) {
+	t++;
+  }
+
+  segment->length = (uint8_t*)t - segment->buffer;
   outbuf = (char *)header + sizeof(*header);
   max_outbytesleft = outbytesleft = min_size(tlv_message->max_size - tlv_message->length, MAX_TLV_LENGTH);
   
   ret = iconv(h->cd_from_wchar[tlv_message->charset],
-			  (char**)&text->buffer, &text->length,
-		&outbuf, &outbytesleft);
+			  (char**)&segment->buffer, &segment->length,
+			  &outbuf, &outbytesleft);
   err = errno;
   if (!ret || (err == E2BIG)) {
 	tlv_message->length += max_outbytesleft - outbytesleft;
 	TLV_ADD_LENGTH(header, max_outbytesleft - outbytesleft);
-	if (err) { // not sufficient room at output
-	  dbg("notice: not sufficient room at output");
+	if (err) { /* not sufficient room at output */
+	  dbg1("notice: not sufficient room at output");
 	}
   } else {
-	// EINVAL:
-	// incomplete multibyte sequence in the input:
-	// unexpected error, complete sequences are expected
-	// EILSEQ:
-	// invalid multibyte sequence in the input:
-	// unexpected error thanks to //TRANSLIT
+	/* 
+	   EINVAL: 
+	   incomplete multibyte sequence in the input:
+	   unexpected error, complete sequences are expected
+	   EILSEQ:
+	   invalid multibyte sequence in the input:
+	   unexpected error thanks to //TRANSLIT
+	*/
 	ret = errno;
 	dbg("unexpected error: %s", strerror(ret));
   }
-  iconv(h->cd_from_wchar[tlv_message->charset], NULL, NULL, NULL, NULL);  
+  iconv(h->cd_from_wchar[tlv_message->charset], NULL, NULL, NULL, NULL);
+  segment->max_size = (uint8_t*)tmax - segment->buffer;
+  state->type = INOTE_TYPE_UNDEFINED;
   return ret;
 }
 
-static inline uint32_t push_ssml(handle_t *h, inote_slice_t *text, inote_slice_t *tlv_message, inote_tlv_t **tlv_last) {
+/* TODO: ssml parser */
+/* Currently any tag is simply filtered. */
+static uint32_t push_tag(handle_t *h, inote_slice_t *segment, inote_state_t *state) {
+  wchar_t *t;
+  wchar_t *tmax;
+
+  if (!state->ssml)
+  	return 1;
+
+  if (!h || !check_slice(segment)) {
+  	dbg1("EINVAL");
+  	return EINVAL;
+  }
+
+  /* collect the full tag segment   */
+  t = (wchar_t *)(segment->buffer);
+  tmax = (wchar_t *)(segment->buffer + segment->max_size);
+
+  while ((t < tmax) && (*t != L'>')) {
+	t++;
+  }
+
+  segment->buffer = (t < tmax) ? (uint8_t*)(t + 1) : (uint8_t*)tmax;
+  segment->length = 0;
+  segment->max_size = (uint8_t*)tmax - segment->buffer;
+  state->type = INOTE_TYPE_UNDEFINED;
+
   return 0;
 }
 
-static inline uint32_t push_punct(handle_t *h, inote_slice_t *text, inote_slice_t *tlv_message, inote_tlv_t **tlv_last) {
+static uint32_t push_punct(handle_t *h, inote_slice_t *segment, inote_state_t *state, inote_slice_t *tlv_message, inote_tlv_t **tlv_last) {
+  int ret = 0;
+  wchar_t *t;
+  wchar_t *tmax;
+  inote_tlv_t *header;
+
+  if (!h || !check_slice(segment) || !check_slice(tlv_message) || !tlv_last ) {
+	dbg1("EINVAL");
+	return EINVAL;
+  }
+
+  t = (wchar_t *)(segment->buffer);
+  tmax = (wchar_t *)(segment->buffer + segment->max_size);
+  
+  if (state->punct_mode == INOTE_PUNCT_MODE_NONE) {
+	if (t < tmax) {	  
+	  header = *tlv_last;
+	  if (!header || (header->type1 != INOTE_TYPE_TEXT)) {
+		tlv_new(tlv_message, INOTE_TYPE_TEXT, tlv_message->charset, &header);
+		*tlv_last = header;
+	  }
+	  
+	  if (!header) {
+		dbg1("out of tlv");
+		return ENOMEM;
+	  }  
+
+	  if (tlv_message->length >= tlv_message->max_size) {
+		dbg1("notice: not sufficient room at output");
+	  } else {
+		tlv_message->buffer[tlv_message->length] = *(uint8_t*)t; // punctuation is expected to be an ascii char 
+		tlv_message->length += 1;
+		TLV_ADD_LENGTH(header, 1);
+		segment->buffer = (uint8_t*)(t + 1);
+		segment->length = 1;
+		segment->max_size -= sizeof(*t);
+		ret = push_text(h, segment, state, tlv_message, tlv_last);
+	  }
+	} else {
+	  segment->buffer = (uint8_t*)tmax;
+	  segment->length = 0;	  
+	}
+  }
+
+  return ret;
+}
+
+static uint32_t push_annotation(handle_t *h, inote_slice_t *segment, inote_state_t *state, inote_slice_t *tlv_message, inote_tlv_t **tlv_last) {
+  if (!state->annotation)
+	return 1;
+
   return 0;
 }
 
-static inline uint32_t push_annotation(handle_t *h, inote_slice_t *text, inote_slice_t *tlv_message, inote_tlv_t **tlv_last) {
+static uint32_t push_entity(handle_t *h, inote_slice_t *segment, inote_state_t *state, inote_slice_t *tlv_message, inote_tlv_t **tlv_last) {
+  if (!state->entity)
+	return 1;
   return 0;
 }
 
-static inline uint32_t push_entity(handle_t *h, inote_slice_t *text, inote_slice_t *tlv_message, inote_tlv_t **tlv_last) {
-  return 0;
-}
-
-// convert a wchar text to type_length_value format
+/* convert a wchar text to type_length_value format */
 static uint32_t get_type_length_value(handle_t *h, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message) {
-  size_t len; // number of wchars
-  wchar_t *end; // end of wchar buffer
-  const wchar_t *real_end = NULL; // first not consumed wide character
-  inote_tlv_t *tlv_last = NULL; // current tlv
-  wchar_t *t; // current wchar
-  wchar_t *max;
+  inote_tlv_t *tlv_last = NULL; /* current tlv */
+  wchar_t *tmax;
   inote_slice_t segment;
-  inote_type_t segment_type = INOTE_TYPE_TEXT;
+  int ret = 1;
   
   if (!h || !check_slice(text) || !state || !check_slice(tlv_message))
 	return 1;
 
   memcpy(&segment, text, sizeof(*text));
-  segment.max_size = segment.length;
+  state->type = INOTE_TYPE_UNDEFINED;
+  segment.max_size = text->length;
   segment.length = 0;
-  t = (wchar_t *)segment.buffer;
-  max = (wchar_t *)(segment.buffer + segment.max_size);
-  
-  while (t < max) {
-	if (iswpunct(*t)) {
-	  int ret = 1;
-	  switch(*t) {
+
+  tmax = (wchar_t *)(segment.buffer + segment.max_size);  
+  while ((wchar_t *)segment.buffer < tmax) {
+	ret = 1;
+	if (iswpunct(*(wchar_t *)segment.buffer)) {
+	  switch(*(wchar_t *)segment.buffer) {
 	  case L'<':
-		if (state->ssml)
-		  ret = push_ssml(h, &segment, tlv_message, &tlv_last);
+		ret = push_tag(h, &segment, state);
 		break;
 	  case L'\'':
-		if (state->annotation)
-		  ret = push_annotation(h, &segment, tlv_message, &tlv_last);
+		ret = push_annotation(h, &segment, state, tlv_message, &tlv_last);
 		break;
 	  case L'&':
-		if (state->entity)
-		  ret = push_entity(h, &segment, tlv_message, &tlv_last);
+		ret = push_entity(h, &segment, state, tlv_message, &tlv_last);
 		break;
 	  default:
 		break;
 	  }
-	  if (ret && (state->punct_mode != INOTE_PUNCT_MODE_NONE))
-		push_punct(h, &segment, tlv_message, &tlv_last);
+	  if (ret) {
+		ret = push_punct(h, &segment, state, tlv_message, &tlv_last);
+	  }
 	}
-	t++;
-	segment.length++;
-  }
+	if (ret) {
+	  ret = push_text(h, &segment, state, tlv_message, &tlv_last);
+	  if (ret) {
+		dbg1("TODO");
+	  }
+	}
+  };
   
-  if (segment_type == INOTE_TYPE_TEXT) {
-	push_text(h, &segment, tlv_message, &tlv_last);
-  }
-  return 0;
+  return ret;
 }
 
 void *inote_create() {
@@ -242,7 +322,7 @@ void inote_delete(void *handle) {
 		iconv_close(h->cd_from_wchar[i]);
 	  }
 	}	
-	memset(h, 0, sizeof(h));
+	memset(h, 0, sizeof(*h));
 	free(h);
   }
 }
@@ -263,9 +343,9 @@ uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote
 	return 1;
   }
   if (!check_slice(text) || !check_slice(tlv_message)) {
-	dbg("Args error (%p, %d)", text, __LINE__);
+	dbg("Args error (%p, %d)", (void*)text, __LINE__);
 	return 1;
-  }
+  }  
   if (!state)
 	return 1;
   
@@ -275,7 +355,7 @@ uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote
 	return 0;
   }
 
-  output.buffer = (char *)h->wchar_buf;
+  output.buffer = (uint8_t*)h->wchar_buf;
   output.length = 0;
   output.charset = INOTE_CHARSET_WCHAR_T;
   output.max_size = sizeof(h->wchar_buf);
@@ -286,9 +366,9 @@ uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote
 	goto end0;
   }
   
-  inbuf = text->buffer;
+  inbuf = (char *)(text->buffer);
   inbytesleft = text->length;
-  outbuf = output.buffer;
+  outbuf = (char *)(output.buffer);
   outbytesleft = output.max_size;
 
   ret = -1;
@@ -299,31 +379,34 @@ uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote
 	if (!ret) {
 	  output.length = output.max_size - outbytesleft;
 	  get_type_length_value(h, &output, state, tlv_message);
-	} else if (errno == E2BIG) { // not sufficient room at output
+	} else if (errno == E2BIG) { /* not sufficient room at output */
 	  output.length = output.max_size - outbytesleft;
 	  get_type_length_value(h, &output, state, tlv_message);
 	  output.length = 0;
-	  outbuf = output.buffer;
+	  outbuf = (char *)(output.buffer);
 	  outbytesleft = output.max_size;
 	} else {
-	  // EINVAL:
-	  // incomplete multibyte sequence in the input:
-	  // unexpected error, complete sequences are expected
-	  // EILSEQ:
-	  // invalid multibyte sequence in the input:
-	  // unexpected error thanks to //TRANSLIT
+	  /* 
+		 EINVAL: 
+		 incomplete multibyte sequence in the input:
+		 unexpected error, complete sequences are expected
+		 EILSEQ:
+		 invalid multibyte sequence in the input:
+		 unexpected error thanks to //TRANSLIT
+	  */
 		ret = 0;
 	}
   }
-  // initial state
+  /* initial state */
   ret = iconv(h->cd_to_wchar[text->charset], NULL, NULL, NULL, NULL);
-  
-  
+    
   if (inbytesleft) {
 	dbg("Failed to convert inbytesleft=%ld bytes",  (long int)inbytesleft);
 	a_status = 1;
   }
 
+  DebugDump("tlv: ", tlv_message->buffer, min_size(tlv_message->length, 256));
+  
  end0:
   return a_status;
 }

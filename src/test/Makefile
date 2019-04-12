@@ -1,4 +1,4 @@
-CFLAGS += $(DEBUG) -I../api
+CFLAGS += $(DEBUG) -I../api -std=c99
 CC = gcc
 DESTDIR ?= ../../build/x86_64/usr/
 

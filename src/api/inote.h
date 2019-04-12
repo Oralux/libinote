@@ -12,71 +12,73 @@ typedef enum {
   INOTE_CHARSET_SJIS,
   INOTE_CHARSET_UTF_8,
   INOTE_CHARSET_UTF_16,
-  INOTE_CHARSET_WCHAR_T,
+  INOTE_CHARSET_WCHAR_T
 } inote_charset_t;
 
 
 typedef enum {
-  INOTE_TYPE_UNDEFINED=0,
-  INOTE_TYPE_TEXT=1,
-  INOTE_TYPE_PUNCTUATION=2,
-  INOTE_TYPE_ANNOTATION=4,
+  INOTE_TYPE_UNDEFINED,
+  INOTE_TYPE_TEXT,
+  INOTE_TYPE_PUNCTUATION,
+  INOTE_TYPE_ANNOTATION,
+  INOTE_TYPE_TAG,
+  INOTE_TYPE_ENTITY
 } inote_type_t;
 
 typedef enum {
-  INOTE_PUNCT_MODE_NONE=0, // does not pronounce punctuation
-  INOTE_PUNCT_MODE_ALL=1, // pronounce all punctuation character
-  INOTE_PUNCT_MODE_SOME=2, // pronounce any punctuation character in the punctuation list
+  INOTE_PUNCT_MODE_NONE=0, /* does not pronounce punctuation */
+  INOTE_PUNCT_MODE_ALL=1, /* pronounce all punctuation character */
+  INOTE_PUNCT_MODE_SOME=2 /* pronounce any punctuation character in the punctuation list */
 } inote_punct_mode_t;
 
-// inote_tlv_t
-//
-// type, length, value description
-// with 
-// - type: value from type1 (see inote_type_t) + type2 (optional info)
-// - length: length2<<8 + length1
-// - value: array of length bytes
-//
-// Text
-// type1 = INOTE_TYPE_TEXT
-// type2 = charset
-//
-// Punctuation
-// type1 = TYPE_PUNCTUATION
-// - type2 = mode (see inote_punct_t)
-//   if mode=some, value=<punctuation list in ascii>
-//
-// - type2 = ascii punctuation char
-//   and length = 0
-//
-// Annotation
-// type1 = INOTE_TYPE_ANNOTATION
-//
+/* inote_tlv_t 
+
+type, length, value description
+with 
+- type: value from type1 (see inote_type_t) + type2 (optional info)
+- length: length2<<8 + length1
+- value: array of length bytes
+
+Text
+type1 = INOTE_TYPE_TEXT
+type2 = charset
+
+Punctuation
+type1 = TYPE_PUNCTUATION
+- type2 = mode (see inote_punct_t)
+  if mode=some, value=<punctuation list in ascii>
+
+- type2 = ascii punctuation char
+  and length = 0
+
+Annotation
+type1 = INOTE_TYPE_ANNOTATION
+*/
 typedef struct {
   uint8_t type1;
   uint8_t type2;
   uint8_t length1;
   uint8_t length2;
-  char value[0];
 } inote_tlv_t;
 #define MAX_TLV_LENGTH (2<<16)
 
 typedef struct {
   uint8_t *buffer; 
-  size_t length; // data length in bytes
+  size_t length; /* data length in bytes */
   inote_charset_t charset;
-  size_t max_size; // allocated buffer size
+  size_t max_size; /* allocated buffer size */
 } inote_slice_t;
   
 typedef struct {
   inote_punct_mode_t punct_mode;
-  uint32_t spelling; // 1 = spelling command already set
-  uint32_t lang; // 0=unknown, otherwise probable language
-  uint32_t *expected_lang; // array of the expected languages
-  uint32_t max_expected_lang; // max number of elements of expected_lang
-  uint32_t ssml; // 1 = SSML tags must be interpreted; 0 = no interpretation
-  uint32_t annotation; // 1 = annotations must be interpreted; 0 = no interpretation
-  uint32_t entity; // 1 = xml entities must be interpreted; 0 = no interpretation
+  uint32_t spelling; /* 1 = spelling command already set */
+  uint32_t lang; /* 0=unknown, otherwise probable language */
+  uint32_t *expected_lang; /* array of the expected languages */
+  uint32_t max_expected_lang; /* max number of elements of expected_lang */
+  uint32_t ssml; /* 1 = SSML tags must be interpreted; 0 = no interpretation */
+  uint32_t annotation; /* 1 = annotations must be interpreted; 0 = no interpretation */
+  uint32_t entity; /* 1 = xml entities must be interpreted; 0 = no interpretation */
+  inote_type_t type; /* currently parsed segment. For example, type = INOTE_TYPE_TAG if an xml tag is currently parsed,  */
 } inote_state_t;
 
 void *inote_create();

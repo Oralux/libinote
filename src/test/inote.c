@@ -34,8 +34,7 @@ int main(int argc, char **argv)
   text.charset = INOTE_CHARSET_UTF_8;
   text.max_size = BUFFER_SIZE;
 
-  state.punct_mode = INOTE_PUNCT_MODE_ALL;
-  state.spelling = 0;
+  //  state.punct_mode = INOTE_PUNCT_MODE_NONE;
   state.expected_lang = calloc(MAX_LANG, sizeof(*state.expected_lang));
   state.expected_lang[0] = ENGLISH;
   state.expected_lang[1] = FRENCH;
@@ -48,6 +47,5 @@ int main(int argc, char **argv)
 
   void *handle = inote_create();
   inote_get_annotated_text(handle, &text, &state, &tlv_message, &text_offset);  
-  printf("tlv_message: %d %d\n", tlv_message.buffer[0], tlv_message.buffer[1]);
   inote_delete(handle);
 }
