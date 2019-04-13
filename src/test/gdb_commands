@@ -1,0 +1,32 @@
+b push_annotation
+b push_entity
+b push_punct
+commands
+p *segment
+eval "x/%dbc segment->s.buffer",segment->s.length
+p *tlv->s
+eval "x/%dbx tlv->s->buffer",tlv->s->length
+c
+end
+b push_tag
+commands
+p *segment
+eval "x/%dbc segment->s.buffer",segment->s.length
+p *tlv->s
+eval "x/%dbx tlv->s->buffer",tlv->s->length
+c
+end
+b push_text
+commands
+p *segment
+eval "x/%dbc segment->s.buffer",segment->s.length
+p *tlv->s
+eval "x/%dbx tlv->s->buffer",tlv->s->length
+c
+end
+b DebugDump
+commands
+eval "x/%dbc buf",size
+c
+end
+r
