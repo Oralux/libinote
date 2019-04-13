@@ -32,7 +32,7 @@ int main(int argc, char **argv)
   text.buffer[BUFFER_SIZE-1] = 0;
   text.length = strlen(text.buffer);
   text.charset = INOTE_CHARSET_UTF_8;
-  text.max_size = BUFFER_SIZE;
+  text.end_of_buffer = text.buffer + BUFFER_SIZE;
 
   //  state.punct_mode = INOTE_PUNCT_MODE_NONE;
   state.expected_lang = calloc(MAX_LANG, sizeof(*state.expected_lang));
@@ -42,7 +42,7 @@ int main(int argc, char **argv)
   state.ssml = 1;
     
   tlv_message.buffer = calloc(1, BUFFER_SIZE);
-  tlv_message.max_size = BUFFER_SIZE;
+  tlv_message.end_of_buffer = tlv_message.buffer + BUFFER_SIZE;
   tlv_message.charset = INOTE_CHARSET_UTF_8;
 
   void *handle = inote_create();

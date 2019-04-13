@@ -66,7 +66,7 @@ typedef struct {
   uint8_t *buffer; 
   size_t length; /* data length in bytes */
   inote_charset_t charset;
-  size_t max_size; /* allocated buffer size */
+  uint8_t *end_of_buffer; /* allocated buffer size */
 } inote_slice_t;
   
 typedef struct {
@@ -78,7 +78,6 @@ typedef struct {
   uint32_t ssml; /* 1 = SSML tags must be interpreted; 0 = no interpretation */
   uint32_t annotation; /* 1 = annotations must be interpreted; 0 = no interpretation */
   uint32_t entity; /* 1 = xml entities must be interpreted; 0 = no interpretation */
-  inote_type_t type; /* currently parsed segment. For example, type = INOTE_TYPE_TAG if an xml tag is currently parsed,  */
 } inote_state_t;
 
 void *inote_create();
