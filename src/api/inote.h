@@ -20,9 +20,7 @@ typedef enum {
   INOTE_TYPE_UNDEFINED,
   INOTE_TYPE_TEXT,
   INOTE_TYPE_PUNCTUATION,
-  INOTE_TYPE_ANNOTATION,
-  INOTE_TYPE_TAG,
-  INOTE_TYPE_ENTITY
+  INOTE_TYPE_ANNOTATION
 } inote_type_t;
 
 typedef enum {
@@ -77,7 +75,6 @@ typedef struct {
   uint32_t max_expected_lang; /* max number of elements of expected_lang */
   uint32_t ssml; /* 1 = SSML tags must be interpreted; 0 = no interpretation */
   uint32_t annotation; /* 1 = annotations must be interpreted; 0 = no interpretation */
-  uint32_t entity; /* 1 = xml entities must be interpreted; 0 = no interpretation */
 } inote_state_t;
 
 void *inote_create();

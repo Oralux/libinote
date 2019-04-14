@@ -4,6 +4,7 @@
 #include <iconv.h>
 #include <errno.h>
 #include <wctype.h>
+#include <wchar.h>
 #include "inote.h"
 #include "conf.h"
 #include "debug.h"
@@ -17,17 +18,32 @@
 #define MAGIC 0x7E40B171
 
 static const char* charset_name[] = {
-	NULL,
-	"ISO-8859-1//TRANSLIT",
-	"GBK//TRANSLIT",
-	"UCS2//TRANSLIT",
-	"BIG5//TRANSLIT",
-	"SJIS//TRANSLIT",
-	"UTF8//TRANSLIT",
-	"UTF16//TRANSLIT",
-	"WCHAR_T//TRANSLIT",
+  NULL,
+  "ISO-8859-1//TRANSLIT",
+  "GBK//TRANSLIT",
+  "UCS2//TRANSLIT",
+  "BIG5//TRANSLIT",
+  "SJIS//TRANSLIT",
+  "UTF8//TRANSLIT",
+  "UTF16//TRANSLIT",
+  "WCHAR_T//TRANSLIT",
 };
 #define MAX_CHARSET (sizeof(charset_name)/sizeof(*charset_name))
+
+typedef struct {
+	const wchar_t *str;
+	wchar_t c;
+	int l;
+} predef_t;
+
+static const predef_t xml_predefined_entity[] = {
+	{L"&quot;", L'"',6},
+	{L"&amp;", L'&',5},
+	{L"&apos;", L'\'',6},
+	{L"&lt;", L'<',4},
+	{L"&gt;", L'>',4},
+};
+#define MAX_ENTITY_NB (sizeof(xml_predefined_entity)/sizeof(xml_predefined_entity[0]))
 
 typedef struct {
   uint32_t magic;
@@ -154,7 +170,7 @@ static tlv_t *tlv_next(tlv_t *self, inote_type_t type1, uint8_t type2) {
   tlv_t *next = NULL;
   inote_tlv_t *header;
 
-  if (!self) {
+  if (!self || !self->s) {
 	return NULL;
   }
   
@@ -166,7 +182,7 @@ static tlv_t *tlv_next(tlv_t *self, inote_type_t type1, uint8_t type2) {
 
   inote_slice_t *s = self->s;
   uint8_t *max = s->buffer + s->length;
-  if (s && (max + sizeof(*header) <= s->end_of_buffer)) {
+  if (max + sizeof(*header) <= s->end_of_buffer) {
 	self->previous_header = header;
 	header = (inote_tlv_t *)max;
 	header->type1 = type1;
@@ -175,6 +191,8 @@ static tlv_t *tlv_next(tlv_t *self, inote_type_t type1, uint8_t type2) {
 	s->length += sizeof(*header);
 	self->header = header;
 	next = self;
+  } else {
+	dbg1("out of tlv");	
   }
   
   return next;
@@ -191,6 +209,8 @@ static int tlv_add_length(tlv_t *self, uint16_t length) {
 	  header->length2 = (len >> 8);
 	  self->s->length += length;
 	  ret = 0;
+	} else {
+	  dbg1("out of tlv");	
 	}
   }
   return ret;
@@ -242,14 +262,11 @@ static uint32_t inote_push_text(inote_t *self, segment_t *segment, inote_state_t
 
   tlv = tlv_next(tlv, INOTE_TYPE_TEXT, tlv->s->charset);
   if (!tlv) {
-	dbg1("out of tlv");
 	return ENOMEM;
   }
 
-  /* collect the full text segment   */
   t = t0 = segment_get_buffer(segment);
   tmax = segment_get_max(segment);
-
   while ((t < tmax) && !iswpunct(*t)) {
 	t++;
   }
@@ -264,9 +281,6 @@ static uint32_t inote_push_text(inote_t *self, segment_t *segment, inote_state_t
   err = errno;
   if (!ret || (err == E2BIG)) {
 	tlv_add_length(tlv, max_outbytesleft - outbytesleft);
-	if (err) { /* not sufficient room at output */
-	  dbg1("notice: not sufficient room at output");
-	}
   } else {
 	/* 
 	   EINVAL: 
@@ -296,23 +310,19 @@ static uint32_t inote_push_tag(inote_t *self, segment_t *segment, inote_state_t 
   	return EINVAL;
   }
 
-  /* collect the full tag segment   */
   t = segment_get_buffer(segment);
   tmax = segment_get_max(segment);
-
   while ((t < tmax) && (*t != L'>')) {
 	t++;
   }
 
   segment_erase(segment, (uint8_t*)(t+1));
-
   return 0;
 }
 
 static uint32_t inote_push_punct(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
   int ret = 0;
-  wchar_t *t;
-  wchar_t *tmax;
+  wchar_t *t, *tmax;
   tlv_t *next = NULL;
   
   if (!self || !segment || !tlv) {
@@ -326,15 +336,12 @@ static uint32_t inote_push_punct(inote_t *self, segment_t *segment, inote_state_
   if (state->punct_mode == INOTE_PUNCT_MODE_NONE) {
 	if (t < tmax) {	  
 	  next = tlv_next(tlv, INOTE_TYPE_TEXT, tlv->s->charset);
-
 	  if (!next) {
-		dbg1("out of tlv");
 		return ENOMEM;
 	  }  
 
 	  uint8_t *free_byte = tlv_get_free_byte(tlv);
 	  if (tlv_add_length(tlv, 1)) {
-		dbg1("notice: not sufficient room at output");
 		goto exit0;
 	  }
 
@@ -354,13 +361,56 @@ static uint32_t inote_push_punct(inote_t *self, segment_t *segment, inote_state_
 static uint32_t inote_push_annotation(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
   if (!state->annotation)
 	return 1;
-
+  
   return 0;
 }
 
 static uint32_t inote_push_entity(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
-  if (!state->entity)
+  wchar_t *t, *tmax;  
+  size_t len;  
+  int i;
+  tlv_t *next = NULL;
+
+  if (!state->ssml)
 	return 1;
+
+  if (!self || !segment || !tlv) {
+	dbg1("EINVAL");
+	return EINVAL;
+  }
+
+  t = segment_get_buffer(segment);
+  tmax = segment_get_max(segment);   
+
+  len = tmax - t;
+  for (i=0; i < MAX_ENTITY_NB; i++) {	
+	if ((len >= xml_predefined_entity[i].l) && !wcsncmp(t, xml_predefined_entity[i].str, xml_predefined_entity[i].l)) {
+	  break;
+	}
+  }
+  if (i == MAX_ENTITY_NB) {
+	return EINVAL;
+  }
+
+  t += xml_predefined_entity[i].l -1;
+  *t = xml_predefined_entity[i].c;
+
+  next = tlv_next(tlv, INOTE_TYPE_TEXT, tlv->s->charset);
+  if (!next) {
+	return ENOMEM;
+  }  
+
+  uint8_t *free_byte = tlv_get_free_byte(tlv);
+  if (tlv_add_length(tlv, 1)) {
+	goto exit0;
+  }
+
+  if (free_byte) {
+	*free_byte = *(uint8_t*)t; // no iconv call: ascii char expected
+  }
+  
+ exit0:
+  segment_erase(segment, (uint8_t*)(t+1));
   return 0;
 }
 
@@ -512,7 +562,7 @@ uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote
 		 invalid multibyte sequence in the input:
 		 unexpected error thanks to //TRANSLIT
 	  */
-		ret = 0;
+	  ret = 0;
 	}
   }
   /* initial state */
