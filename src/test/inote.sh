@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 touch /tmp/libinote.ok
 
@@ -15,10 +15,6 @@ doTest() {
 	echo -e "text:\n$TEXT"
 	cat /tmp/libinote.log.*
 }
-
-for i in "${testArray[@]}"; do
-	echo "i=$i"
-done
 
 if [ "$1" = "-g" ]; then
 	text="${testArray[0]}"
