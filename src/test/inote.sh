@@ -1,27 +1,32 @@
 #!/bin/bash
 
-touch /tmp/libinote.ok
+#touch /tmp/libinote.ok
 
 unset testArray
 i=0
 testArray[$((i++))]="Un éléphant"
-testArray[$((i++))]="<speak>Un &quot;éléphant&quot; ! təmei̥ɾou̥</speak>"
+testArray[$((i++))]="<speak>Un &lt;éléphant&gt; (1)</speak>"
 
 doTest() {
 	TEXT="$1"
-	rm /tmp/libinote.log.*
-	./inote "$TEXT"
+	PUNCT_MODE="$2"
+#	rm -f /tmp/libinote.log.*
 	echo "----------------------------------"
 	echo -e "text:\n$TEXT"
-	cat /tmp/libinote.log.*
+	echo -e "tlv:"
+	./inote -p $PUNCT_MODE -t "$TEXT" | hexdump -Cv
 }
+
+#PUNCT_MODE=0
+PUNCT_MODE=1
+# PUNCT_MODE=2
 
 if [ "$1" = "-g" ]; then
 	text="${testArray[0]}"
-	gdb -ex "set args \"${testArray[-1]}\"" -x gdb_commands ./inote
+	gdb -ex "set args -p $PUNCT_MODE -t \"${testArray[-1]}\"" -x gdb_commands ./inote
 else
 	for i in "${testArray[@]}"; do
-		doTest "$i"
+		doTest "$i" $PUNCT_MODE
 	done
 fi
 

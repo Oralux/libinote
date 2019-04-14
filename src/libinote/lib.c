@@ -170,14 +170,19 @@ static tlv_t *tlv_next(tlv_t *self, inote_type_t type1, uint8_t type2) {
   tlv_t *next = NULL;
   inote_tlv_t *header;
 
-  if (!self || !self->s) {
+  if (!self || !self->s || (type1 == INOTE_TYPE_UNDEFINED)) {
 	return NULL;
   }
   
   header = self->header;
-  if ((type1 == INOTE_TYPE_UNDEFINED)
-	  || (header && (type1 == header->type1) && (header->type1 == INOTE_TYPE_TEXT))) {
-	return self; // keep current segment
+  if (header) {
+	if (header->type1 == INOTE_TYPE_UNDEFINED) {
+	  header->length1 = header->length2 = 0;
+	  return self;
+	}
+	if ((type1 == header->type1) && (header->type1 == INOTE_TYPE_TEXT)) {
+	  return self;
+	}
   }  
 
   inote_slice_t *s = self->s;
@@ -267,6 +272,8 @@ static uint32_t inote_push_text(inote_t *self, segment_t *segment, inote_state_t
 
   t = t0 = segment_get_buffer(segment);
   tmax = segment_get_max(segment);
+  // the first char is considered as text
+  t++;
   while ((t < tmax) && !iswpunct(*t)) {
 	t++;
   }
@@ -333,28 +340,24 @@ static uint32_t inote_push_punct(inote_t *self, segment_t *segment, inote_state_
   t = segment_get_buffer(segment);
   tmax = segment_get_max(segment);
   
-  if (state->punct_mode == INOTE_PUNCT_MODE_NONE) {
+  switch (state->punct_mode) {
+  case INOTE_PUNCT_MODE_NONE:
+	  ret = inote_push_text(self, segment, state, tlv);	  
+	break;
+  case INOTE_PUNCT_MODE_ALL: {
 	if (t < tmax) {	  
-	  next = tlv_next(tlv, INOTE_TYPE_TEXT, tlv->s->charset);
+	  next = tlv_next(tlv, INOTE_TYPE_PUNCTUATION, INOTE_PUNCT_FOUND);
 	  if (!next) {
 		return ENOMEM;
 	  }  
-
-	  uint8_t *free_byte = tlv_get_free_byte(tlv);
-	  if (tlv_add_length(tlv, 1)) {
-		goto exit0;
-	  }
-
-	  if (free_byte) {
-		*free_byte = *(uint8_t*)t; // no iconv call: ascii char expected
-	  }
-
-	  segment_erase(segment, (uint8_t*)(t+1));
+	  // then process the punctuation character as usual text
 	  ret = inote_push_text(self, segment, state, tlv);	  
 	}
   }
-
- exit0:
+	break;
+  default:
+	break;
+  }
   return ret;
 }
 
@@ -369,8 +372,8 @@ static uint32_t inote_push_entity(inote_t *self, segment_t *segment, inote_state
   wchar_t *t, *tmax;  
   size_t len;  
   int i;
-  tlv_t *next = NULL;
-
+  int ret;
+  
   if (!state->ssml)
 	return 1;
 
@@ -395,26 +398,12 @@ static uint32_t inote_push_entity(inote_t *self, segment_t *segment, inote_state
   t += xml_predefined_entity[i].l -1;
   *t = xml_predefined_entity[i].c;
 
-  next = tlv_next(tlv, INOTE_TYPE_TEXT, tlv->s->charset);
-  if (!next) {
-	return ENOMEM;
-  }  
-
-  uint8_t *free_byte = tlv_get_free_byte(tlv);
-  if (tlv_add_length(tlv, 1)) {
-	goto exit0;
-  }
-
-  if (free_byte) {
-	*free_byte = *(uint8_t*)t; // no iconv call: ascii char expected
-  }
+  segment_erase(segment, (uint8_t*)t);
+  ret = inote_push_text(self, segment, state, tlv);	    
   
- exit0:
-  segment_erase(segment, (uint8_t*)(t+1));
-  return 0;
+  return ret;
 }
 
-/* convert a wchar text to type_length_value format */
 static uint32_t inote_get_type_length_value(inote_t *self, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message) {
   wchar_t *tmax;
   wchar_t *t;

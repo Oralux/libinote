@@ -12,7 +12,7 @@ typedef enum {
   INOTE_CHARSET_SJIS,
   INOTE_CHARSET_UTF_8,
   INOTE_CHARSET_UTF_16,
-  INOTE_CHARSET_WCHAR_T
+  INOTE_CHARSET_WCHAR_T,
 } inote_charset_t;
 
 
@@ -20,13 +20,14 @@ typedef enum {
   INOTE_TYPE_UNDEFINED,
   INOTE_TYPE_TEXT,
   INOTE_TYPE_PUNCTUATION,
-  INOTE_TYPE_ANNOTATION
+  INOTE_TYPE_ANNOTATION,
 } inote_type_t;
 
 typedef enum {
   INOTE_PUNCT_MODE_NONE=0, /* does not pronounce punctuation */
   INOTE_PUNCT_MODE_ALL=1, /* pronounce all punctuation character */
-  INOTE_PUNCT_MODE_SOME=2 /* pronounce any punctuation character in the punctuation list */
+  INOTE_PUNCT_MODE_SOME=2, /* pronounce any punctuation character in the punctuation list */
+  INOTE_PUNCT_FOUND=0xff, /* punctuation character */
 } inote_punct_mode_t;
 
 /* inote_tlv_t 
@@ -46,8 +47,7 @@ type1 = TYPE_PUNCTUATION
 - type2 = mode (see inote_punct_t)
   if mode=some, value=<punctuation list in ascii>
 
-- type2 = ascii punctuation char
-  and length = 0
+- type2 = 0xff, found punctuation character
 
 Annotation
 type1 = INOTE_TYPE_ANNOTATION
@@ -96,16 +96,19 @@ void inote_delete(void *handle);
   RETURN: 0 if no error
   
   Example
-  input: text="`Pf2()? <speak>Un&nbsp;éléphant,"  
+  input: text="`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"  
   output:
   
-  |-------------------+--------+---------------|
-  | Type              | Length | Value         |
-  |-------------------+--------+---------------|
-  | some punctuation  |      3 | "()?"         |
-  | utf8 text         |     11 | "Un éléphant" |
-  | punctuation=","   |      0 |               |
-  |-------------------+--------+---------------|
+  |-------------------+--------+------------------|
+  | Type              | Length | Value            |
+  |-------------------+--------+------------------|
+  | some punctuation  |      3 | "()?"            |
+  | utf8 text         |     16 | "Un <éléphant> " |
+  | found punctuation |      0 |                  |
+  | utf8 text         |      2 | "(1"             |
+  | found punctuation |      0 |                  |
+  | utf8 text         |      1 | ")"              |
+  |-------------------+--------+------------------|
 
 */
   uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message, size_t *text_offset);
