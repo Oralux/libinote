@@ -1,4 +1,11 @@
 b inote_push_annotation
+commands
+p *segment
+eval "x/%dbc segment->s.buffer",segment->s.length
+p *tlv->s
+eval "x/%dbx tlv->s->buffer",tlv->s->length
+c
+end
 b inote_push_entity
 commands
 p *segment

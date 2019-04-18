@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
 #include <iconv.h>
@@ -52,6 +53,7 @@ typedef struct {
   iconv_t cd_from_wchar[MAX_CHARSET];
   wchar_t punctuation_list[MAX_PUNCT];
   wchar_t token[MAX_TOK];
+  uint32_t count;
 } inote_t;
 
 typedef struct {
@@ -330,7 +332,7 @@ static uint32_t inote_push_tag(inote_t *self, segment_t *segment, inote_state_t 
 static uint32_t inote_push_punct(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
   int ret = 0;
   wchar_t *t, *tmax;
-  tlv_t *next = NULL;
+  bool signal_punctuation = false;
   
   if (!self || !segment || !tlv) {
 	dbg1("EINVAL");
@@ -341,31 +343,103 @@ static uint32_t inote_push_punct(inote_t *self, segment_t *segment, inote_state_
   tmax = segment_get_max(segment);
   
   switch (state->punct_mode) {
-  case INOTE_PUNCT_MODE_NONE:
-	  ret = inote_push_text(self, segment, state, tlv);	  
-	break;
-  case INOTE_PUNCT_MODE_ALL: {
-	if (t < tmax) {	  
-	  next = tlv_next(tlv, INOTE_TYPE_PUNCTUATION, INOTE_PUNCT_FOUND);
-	  if (!next) {
-		return ENOMEM;
-	  }  
-	  // then process the punctuation character as usual text
-	  ret = inote_push_text(self, segment, state, tlv);	  
+  case INOTE_PUNCT_MODE_SOME: {
+	int i;
+	for (i=0; i<MAX_PUNCT && self->punctuation_list[i]; i++) {
+	  if (self->punctuation_list[i] == *t) {
+		signal_punctuation = true;
+		break;
+	  }
 	}
-  }
+  }	  
+	break;
+  case INOTE_PUNCT_MODE_ALL:
+	signal_punctuation = true;
 	break;
   default:
 	break;
   }
+
+  ret = ENOMEM;
+  if (!signal_punctuation) {
+	  ret = inote_push_text(self, segment, state, tlv);	  
+  } else if ((t < tmax) && tlv_next(tlv, INOTE_TYPE_PUNCTUATION, INOTE_PUNCT_FOUND)) {
+	// then process the punctuation character as usual text
+	ret = inote_push_text(self, segment, state, tlv);	  
+  }
+
   return ret;
 }
 
 static uint32_t inote_push_annotation(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
+  wchar_t *t0, *t, *tmax;  
+  tlv_t *next;
+  size_t len;
+  
   if (!state->annotation)
 	return 1;
+
+  if (!self || !segment || !tlv) {
+  	dbg1("EINVAL");
+  	return EINVAL;
+  }
+
+  t0 = t = segment_get_buffer(segment);
+  tmax = segment_get_max(segment);
+  while ((t < tmax) && (*t != L' ')) {
+	t++;
+  }
+
+  int ret = 0;
+  if (t >= tmax) {
+	ret = 1;
+	goto exit0;
+  }	
   
-  return 0;
+  if (!wcsncmp(t0, L"`gfa1 ", 6)) {
+	state->ssml = 1;
+	goto exit0;
+  }
+
+  if (!wcsncmp(t0, L"`gfa2 ", 6)) {
+	goto exit0;
+  }
+
+  if (!wcsncmp(t0, L"`Pf", 3)) {
+	switch(t0[3]) {
+	case L'0':
+	  state->punct_mode = INOTE_PUNCT_MODE_NONE;
+	  break;
+	case L'1':
+	  state->punct_mode = INOTE_PUNCT_MODE_ALL;
+	  break;
+	case L'2':
+	  state->punct_mode = INOTE_PUNCT_MODE_SOME;	  
+	  len = min_size(t - (t0 + 4), MAX_PUNCT-1);
+	  wcsncpy(self->punctuation_list, t0+4, len);
+	  self->punctuation_list[len] = 0;
+	  break;
+	default:
+	  ret = 1;
+	  break;
+	  }
+	goto exit0;
+  }
+  
+  next = tlv_next(tlv, INOTE_TYPE_ANNOTATION, 0);
+  if (!next) {
+	return ENOMEM;
+  }  
+
+  ret = 1;
+
+  exit0:
+  if (ret == 1) {
+	ret = inote_push_text(self, segment, state, tlv);	
+  } else {
+	segment_erase(segment, (uint8_t*)(t+1));
+  }
+  return ret;
 }
 
 static uint32_t inote_push_entity(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
@@ -425,7 +499,7 @@ static uint32_t inote_get_type_length_value(inote_t *self, const inote_slice_t *
 	  case L'<':
 		ret = inote_push_tag(self, &segment, state, &tlv);
 		break;
-	  case L'\'':
+	  case L'`':
 		ret = inote_push_annotation(self, &segment, state, &tlv);
 		break;
 	  case L'&':

@@ -76,7 +76,8 @@ int main(int argc, char **argv)
   state.expected_lang[0] = ENGLISH;
   state.expected_lang[1] = FRENCH;
   state.max_expected_lang = MAX_LANG;
-  state.ssml = 1;
+  //  state.ssml = 0;
+  state.annotation = 1;
     
   tlv_message.buffer = calloc(1, BUFFER_SIZE);
   tlv_message.end_of_buffer = tlv_message.buffer + BUFFER_SIZE;
