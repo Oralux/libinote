@@ -18,47 +18,48 @@ typedef enum {
 
 typedef enum {
   INOTE_TYPE_UNDEFINED,
-  INOTE_TYPE_TEXT,
-  INOTE_TYPE_PUNCTUATION,
-  INOTE_TYPE_ANNOTATION,
+  INOTE_TYPE_TEXT=(1<<0),
+  INOTE_TYPE_CHARSET=(1<<1),
+  INOTE_TYPE_PUNCTUATION=INOTE_TYPE_TEXT+(1<<2),
+  INOTE_TYPE_ANNOTATION=INOTE_TYPE_TEXT+(1<<3),
 } inote_type_t;
+
+#define INOTE_ANNOTATION
 
 typedef enum {
   INOTE_PUNCT_MODE_NONE=0, /* does not pronounce punctuation */
   INOTE_PUNCT_MODE_ALL=1, /* pronounce all punctuation character */
   INOTE_PUNCT_MODE_SOME=2, /* pronounce any punctuation character in the punctuation list */
-  INOTE_PUNCT_FOUND=0xff, /* punctuation character */
+  INOTE_PUNCT_FOUND=UINT8_MAX, /* punctuation character */
 } inote_punct_mode_t;
 
 /* inote_tlv_t 
 
 type, length, value description
 with 
-- type: value from type1 (see inote_type_t) + type2 (optional info)
-- length: length2<<8 + length1
+- type: see inote_type_t
+- length: 0..255
 - value: array of length bytes
 
 Text
-type1 = INOTE_TYPE_TEXT
-type2 = charset
+type = INOTE_TYPE_TEXT
 
-Punctuation
-type1 = TYPE_PUNCTUATION
-- type2 = mode (see inote_punct_t)
-  if mode=some, value=<punctuation list in ascii>
-
-- type2 = 0xff, found punctuation character
+Punctuation character (to be said)
+type = INOTE_TYPE_PUNCTUATION
+length = 1 + remaining text (first char=punctuation cra, followed by text) 
 
 Annotation
-type1 = INOTE_TYPE_ANNOTATION
+type = INOTE_TYPE_ANNOTATION
+length = annotation + remaining text
 */
 typedef struct {
-  uint8_t type1;
-  uint8_t type2;
-  uint8_t length1;
-  uint8_t length2;
+  uint8_t type;
+  uint8_t length;
 } inote_tlv_t;
-#define MAX_TLV_LENGTH (2<<16)
+
+#define TLV_LENGTH_MAX (1+UINT8_MAX)
+#define TLV_HEADER_LENGTH_MAX sizeof(inote_tlv_t)
+#define TLV_VALUE_LENGTH_MAX (TLV_LENGTH_MAX - TLV_HEADER_LENGTH_MAX)
 
 typedef struct {
   uint8_t *buffer; 
@@ -77,8 +78,14 @@ typedef struct {
   uint32_t annotation; /* 1 = annotations must be interpreted; 0 = no interpretation */
 } inote_state_t;
 
-void *inote_create();
+typedef enum {
+  INOTE_OK=0,
+  INOTE_ARGS_ERROR,
+  INOTE_CHARSET_ERROR,
+  INOTE_ERROR_MAX,
+} inote_error;
 
+void *inote_create();
 void inote_delete(void *handle);
 
 /*
@@ -92,7 +99,7 @@ void inote_delete(void *handle);
 
   tlv: type_length_value formated data; text sections encoded in the
   indicated charset
-  text_offset: the first not yet consumed byte in text->buffer 
+  text_left: number of bytes not yet consumed in text->buffer 
   RETURN: 0 if no error
   
   Example
@@ -111,6 +118,9 @@ void inote_delete(void *handle);
   |-------------------+--------+------------------|
 
 */
-  uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message, size_t *text_offset);
+  inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message, size_t *text_left);
+
+  inote_error inote_convert_tlv_to_text(void *handle, inote_slice_t *tlv_message, inote_state_t *state, const inote_slice_t *text, size_t *tlva_offset);
+
 
 #endif

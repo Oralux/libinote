@@ -17,6 +17,7 @@
 #define MAX_PUNCT 50
 #define MAX_TOK 100
 #define MAGIC 0x7E40B171
+#define TLV_VALUE_LENGTH_THRESHOLD 16
 
 static const char* charset_name[] = {
   NULL,
@@ -67,11 +68,21 @@ typedef struct {
   inote_tlv_t *previous_header;
 } tlv_t;
 
+typedef enum {
+  _INOTE_OK=INOTE_OK,
+  _INOTE_ARGS_ERROR=INOTE_ARGS_ERROR,
+  _INOTE_CHARSET_ERROR=INOTE_CHARSET_ERROR,
+  _INOTE_START_OF_INTERNAL_ERROR=INOTE_ERROR_MAX,
+  _INOTE_TLV_MESSAGE_FULL, // no other tlv can be added to tlv_message
+  _INOTE_TLV_FULL, // the current tlv is full
+  _INOTE_UNPROCESSED,
+} _inote_error;
+
 static size_t min_size(size_t a, size_t b) {
   return (a<b) ? a : b;
 }
 
-static uint32_t slice_check(const inote_slice_t *self) {
+static bool slice_check(const inote_slice_t *self) {
   return (self && self->buffer
 		  && (self->buffer + self->length <= self->end_of_buffer)
 		  && (self->charset > INOTE_CHARSET_UNDEFINED) && (self->charset < MAX_CHARSET));
@@ -99,8 +110,8 @@ static uint8_t *slice_get_free_byte(inote_slice_t *self) {
   return free_byte;
 }
 
-static int segment_init(segment_t *self, const inote_slice_t *text) {
-  int ret = 1;  
+static _inote_error segment_init(segment_t *self, const inote_slice_t *text) {
+  _inote_error ret = _INOTE_ARGS_ERROR;  
   if (self && text) {
 	inote_slice_t *s = &self->s;
 	memset(self, 0, sizeof(*self));
@@ -108,7 +119,7 @@ static int segment_init(segment_t *self, const inote_slice_t *text) {
 	self->type = INOTE_TYPE_UNDEFINED;
 	s->end_of_buffer = text->buffer + text->length;
 	s->length = 0;
-	ret = 0;
+	ret = _INOTE_OK;
   }
   return ret;
 }
@@ -156,46 +167,48 @@ static void segment_erase(segment_t *self, uint8_t* buffer) {
 /*   return self; */
 /* } */
 
-static int tlv_init(tlv_t *self, inote_slice_t *tlv_message) {
-  int ret = 1;  
+static _inote_error tlv_init(tlv_t *self, inote_slice_t *tlv_message) {
+  int ret = _INOTE_ARGS_ERROR;  
   if (self && tlv_message) {
 	inote_tlv_t *header = (inote_tlv_t *)(tlv_message->buffer + tlv_message->length);
 	memset(header, 0, sizeof(*header));
 	memset(self, 0, sizeof(*self));
 	self->s = tlv_message;
-	ret = 0;
+	ret = _INOTE_OK;
   }
   return ret;
 }
 
-static tlv_t *tlv_next(tlv_t *self, inote_type_t type1, uint8_t type2) {
+static tlv_t *tlv_next(tlv_t *self, inote_type_t type) {
   tlv_t *next = NULL;
   inote_tlv_t *header;
-
-  if (!self || !self->s || (type1 == INOTE_TYPE_UNDEFINED)) {
+  uint8_t *free_byte = NULL;
+  inote_slice_t *s = NULL;
+  
+  if (!self || !self->s || (type == INOTE_TYPE_UNDEFINED)) {
 	return NULL;
   }
   
   header = self->header;
   if (header) {
-	if (header->type1 == INOTE_TYPE_UNDEFINED) {
-	  header->length1 = header->length2 = 0;
+	if (header->type == INOTE_TYPE_UNDEFINED) {
+	  header->length = 0;
 	  return self;
 	}
-	if ((type1 == header->type1) && (header->type1 == INOTE_TYPE_TEXT)) {
+	if ((type == header->type) && (header->type == INOTE_TYPE_TEXT)
+		&& (header->length < TLV_VALUE_LENGTH_MAX-TLV_VALUE_LENGTH_THRESHOLD)) {
 	  return self;
 	}
   }  
 
-  inote_slice_t *s = self->s;
-  uint8_t *max = s->buffer + s->length;
-  if (max + sizeof(*header) <= s->end_of_buffer) {
+  s = self->s;
+  free_byte = s->buffer + s->length;
+  if (free_byte + TLV_LENGTH_MAX <= s->end_of_buffer) {
 	self->previous_header = header;
-	header = (inote_tlv_t *)max;
-	header->type1 = type1;
-	header->type2 = type2;
-	header->length1 = header->length2 = 0;
-	s->length += sizeof(*header);
+	header = (inote_tlv_t *)free_byte;
+	header->type = type;
+	header->length = 0;
+	s->length += TLV_HEADER_LENGTH_MAX; // used bytes: only header at this stage
 	self->header = header;
 	next = self;
   } else {
@@ -205,71 +218,76 @@ static tlv_t *tlv_next(tlv_t *self, inote_type_t type1, uint8_t type2) {
   return next;
 }
 
-static int tlv_add_length(tlv_t *self, uint16_t length) {
-  int ret = 1;
-  if (self && self->header && self->s) {
-	inote_slice_t *s = self->s;
-	if (slice_get_free_size(s) >= length) {
-	  inote_tlv_t *header = self->header;
-	  uint16_t len = length + header->length1 + ((header->length2)<<8);
-	  header->length1 = (len & 0xff);
-	  header->length2 = (len >> 8);
-	  self->s->length += length;
-	  ret = 0;
-	} else {
-	  dbg1("out of tlv");	
-	}
+static _inote_error tlv_add_length(tlv_t *self, uint16_t *length) {
+  inote_slice_t *s;
+  inote_tlv_t *header;
+  uint8_t len;
+
+  if (!self || !self->header || !self->s || !length) {
+	dbg1("_INOTE_ERROR_ARGS");		 
+	return _INOTE_ARGS_ERROR;
   }
-  return ret;
+	  
+  s = self->s;
+  if (slice_get_free_size(s) < *length) {
+	dbg1("_INOTE_TLV_MESSAGE_FULL");		 	
+	return _INOTE_TLV_MESSAGE_FULL;
+  }
+  
+  header = self->header;
+  len = min_size(*length, TLV_VALUE_LENGTH_MAX - header->length);
+  if (!len) {
+	dbg1("_INOTE_TLV_FULL");		 	
+	return _INOTE_TLV_FULL;
+  }
+  *length -= len;
+  header->length += len;
+  self->s->length += len;
+  return _INOTE_OK;
 }
 
 static uint8_t *tlv_get_free_byte(tlv_t *self) {
-  uint8_t *free_byte = NULL;  
-  if (self) {
-	free_byte = slice_get_free_byte(self->s);
-  }
-  return free_byte;
+  return (self) ? slice_get_free_byte(self->s) : NULL;
 }
 
+// get free size in the current tlv
 static size_t tlv_get_free_size(tlv_t *self) {
-  size_t s = 0;  
-  if (self) {
-	s = min_size(slice_get_free_size(self->s), MAX_TLV_LENGTH);
-  }
-  return s;
+  return (self && self->header) ? TLV_VALUE_LENGTH_MAX - self->header->length : 0;
 }
 
-static uint32_t get_charset(iconv_t *cd, const char *tocode, const char *fromcode) {
+static _inote_error get_charset(iconv_t *cd, const char *tocode, const char *fromcode) {
   uint32_t ret = 0;
   if (!cd)
-	return EINVAL;
+	return _INOTE_ARGS_ERROR;
   
   if (*cd != ICONV_ERROR)
-	return 0;
+	return _INOTE_OK;
 
   *cd = iconv_open(tocode, fromcode);
   if (*cd == ICONV_ERROR) {
-	ret = errno;
-	dbg("Error iconv_open: from %s to %s (%s)", fromcode, tocode, strerror(ret));
+	int status = errno;
+	dbg("Error iconv_open: from %s to %s (%s)", fromcode, tocode, strerror(status));
+	ret = _INOTE_CHARSET_ERROR;
   }
   return ret;
 }
 
-static uint32_t inote_push_text(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
+static _inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
   char *outbuf;
   size_t outbytesleft, max_outbytesleft = 0;
-  int ret = 0;
+  _inote_error ret = _INOTE_OK;  
+  int status;
   int err = 0;
   wchar_t *t, *t0, *tmax;
   
   if (!self || !segment || !tlv) {
-	dbg1("EINVAL");
-	return EINVAL;
+	dbg1("_INOTE_ARGS_ERROR");
+	return _INOTE_ARGS_ERROR;
   }
 
-  tlv = tlv_next(tlv, INOTE_TYPE_TEXT, tlv->s->charset);
+  tlv = tlv_next(tlv, first);
   if (!tlv) {
-	return ENOMEM;
+	return _INOTE_TLV_MESSAGE_FULL;
   }
 
   t = t0 = segment_get_buffer(segment);
@@ -284,12 +302,13 @@ static uint32_t inote_push_text(inote_t *self, segment_t *segment, inote_state_t
   outbuf = (char*)tlv_get_free_byte(tlv);
   max_outbytesleft = outbytesleft = tlv_get_free_size(tlv);
   
-  ret = iconv(self->cd_from_wchar[tlv->s->charset],
-			  (char**)&segment->s.buffer, &segment->s.length,
-			  &outbuf, &outbytesleft);
+  status = iconv(self->cd_from_wchar[tlv->s->charset],
+				 (char**)&segment->s.buffer, &segment->s.length,
+				 &outbuf, &outbytesleft);
   err = errno;
-  if (!ret || (err == E2BIG)) {
-	tlv_add_length(tlv, max_outbytesleft - outbytesleft);
+  if (!status || (err == E2BIG)) {
+	uint16_t length = max_outbytesleft - outbytesleft;
+	ret = tlv_add_length(tlv, &length);
   } else {
 	/* 
 	   EINVAL: 
@@ -299,8 +318,8 @@ static uint32_t inote_push_text(inote_t *self, segment_t *segment, inote_state_t
 	   invalid multibyte sequence in the input:
 	   unexpected error thanks to //TRANSLIT
 	*/
-	ret = errno;
-	dbg("unexpected error: %s", strerror(ret));
+	dbg("unexpected error: %s", strerror(err));
+	ret = _INOTE_ARGS_ERROR;
   }
   iconv(self->cd_from_wchar[tlv->s->charset], NULL, NULL, NULL, NULL);
   return ret;
@@ -308,15 +327,15 @@ static uint32_t inote_push_text(inote_t *self, segment_t *segment, inote_state_t
 
 /* TODO: ssml parser */
 /* Currently any tag is simply filtered. */
-static uint32_t inote_push_tag(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
+static _inote_error inote_push_tag(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
   wchar_t *t, *tmax;
 
   if (!state->ssml)
-  	return 1;
+  	return _INOTE_UNPROCESSED;
 
   if (!self || !segment || !tlv) {
-  	dbg1("EINVAL");
-  	return EINVAL;
+  	dbg1("_INOTE_ARGS_ERROR");
+  	return _INOTE_ARGS_ERROR;
   }
 
   t = segment_get_buffer(segment);
@@ -326,17 +345,17 @@ static uint32_t inote_push_tag(inote_t *self, segment_t *segment, inote_state_t 
   }
 
   segment_erase(segment, (uint8_t*)(t+1));
-  return 0;
+  return _INOTE_OK;
 }
 
-static uint32_t inote_push_punct(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
+static _inote_error inote_push_punct(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
   int ret = 0;
   wchar_t *t, *tmax;
   bool signal_punctuation = false;
   
   if (!self || !segment || !tlv) {
-	dbg1("EINVAL");
-	return EINVAL;
+	dbg1("_INOTE_ARGS_ERROR");
+	return _INOTE_ARGS_ERROR;
   }
 
   t = segment_get_buffer(segment);
@@ -360,28 +379,28 @@ static uint32_t inote_push_punct(inote_t *self, segment_t *segment, inote_state_
 	break;
   }
 
-  ret = ENOMEM;
+  ret = _INOTE_UNPROCESSED;
   if (!signal_punctuation) {
-	  ret = inote_push_text(self, segment, state, tlv);	  
-  } else if ((t < tmax) && tlv_next(tlv, INOTE_TYPE_PUNCTUATION, INOTE_PUNCT_FOUND)) {
-	// then process the punctuation character as usual text
-	ret = inote_push_text(self, segment, state, tlv);	  
+	ret = inote_push_text(self, INOTE_TYPE_TEXT, segment, state, tlv);	  
+  } else if (t < tmax) {
+	ret = inote_push_text(self, INOTE_TYPE_PUNCTUATION, segment, state, tlv);	  
   }
 
   return ret;
 }
 
-static uint32_t inote_push_annotation(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
+static _inote_error inote_push_annotation(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
   wchar_t *t0, *t, *tmax;  
-  tlv_t *next;
   size_t len;
+  inote_type_t first = INOTE_TYPE_UNDEFINED;
+  int ret = _INOTE_OK;
   
   if (!state->annotation)
-	return 1;
+	return _INOTE_UNPROCESSED;
 
   if (!self || !segment || !tlv) {
-  	dbg1("EINVAL");
-  	return EINVAL;
+  	dbg1("_INOTE_ARGS_ERROR");
+  	return _INOTE_ARGS_ERROR;
   }
 
   t0 = t = segment_get_buffer(segment);
@@ -390,9 +409,8 @@ static uint32_t inote_push_annotation(inote_t *self, segment_t *segment, inote_s
 	t++;
   }
 
-  int ret = 0;
   if (t >= tmax) {
-	ret = 1;
+	ret = _INOTE_UNPROCESSED;
 	goto exit0;
   }	
   
@@ -402,6 +420,7 @@ static uint32_t inote_push_annotation(inote_t *self, segment_t *segment, inote_s
   }
 
   if (!wcsncmp(t0, L"`gfa2 ", 6)) {
+	// obsolete punc filter
 	goto exit0;
   }
 
@@ -420,45 +439,42 @@ static uint32_t inote_push_annotation(inote_t *self, segment_t *segment, inote_s
 	  self->punctuation_list[len] = 0;
 	  break;
 	default:
-	  ret = 1;
+	  first = INOTE_TYPE_TEXT; // unexpected value
+	  ret = _INOTE_UNPROCESSED;
 	  break;
 	  }
 	goto exit0;
   }
   
-  next = tlv_next(tlv, INOTE_TYPE_ANNOTATION, 0);
-  if (!next) {
-	return ENOMEM;
-  }  
-
-  ret = 1;
+  first = INOTE_TYPE_ANNOTATION;
+  ret = _INOTE_UNPROCESSED;
 
   exit0:
-  if (ret == 1) {
-	ret = inote_push_text(self, segment, state, tlv);	
+  if (ret == _INOTE_UNPROCESSED) {
+	ret = inote_push_text(self, first, segment, state, tlv);	
   } else {
 	segment_erase(segment, (uint8_t*)(t+1));
   }
   return ret;
 }
 
-static uint32_t inote_push_entity(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
+static _inote_error inote_push_entity(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
   wchar_t *t, *tmax;  
   size_t len;  
   int i;
-  int ret;
+  _inote_error ret = _INOTE_UNPROCESSED;
   
   if (!state->ssml)
-	return 1;
+	return _INOTE_UNPROCESSED;
 
   if (!self || !segment || !tlv) {
-	dbg1("EINVAL");
-	return EINVAL;
+	dbg1("_INOTE_ARGS_ERROR");
+	return _INOTE_ARGS_ERROR;
   }
 
   t = segment_get_buffer(segment);
-  tmax = segment_get_max(segment);   
-
+  tmax = segment_get_max(segment);
+  
   len = tmax - t;
   for (i=0; i < MAX_ENTITY_NB; i++) {	
 	if ((len >= xml_predefined_entity[i].l) && !wcsncmp(t, xml_predefined_entity[i].str, xml_predefined_entity[i].l)) {
@@ -466,34 +482,38 @@ static uint32_t inote_push_entity(inote_t *self, segment_t *segment, inote_state
 	}
   }
   if (i == MAX_ENTITY_NB) {
-	return EINVAL;
+	return _INOTE_ARGS_ERROR;
   }
 
   t += xml_predefined_entity[i].l -1;
   *t = xml_predefined_entity[i].c;
 
   segment_erase(segment, (uint8_t*)t);
-  ret = inote_push_text(self, segment, state, tlv);	    
+  if (iswpunct(*t)) {
+	ret = inote_push_punct(self, segment, state, tlv);
+  } else {
+	ret = inote_push_text(self, INOTE_TYPE_TEXT, segment, state, tlv);
+  }
   
   return ret;
 }
 
-static uint32_t inote_get_type_length_value(inote_t *self, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message) {
+static _inote_error inote_get_type_length_value(inote_t *self, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message) {
   wchar_t *tmax;
   wchar_t *t;
   segment_t segment;
   tlv_t tlv;
-  int ret = 1;
+  _inote_error ret = _INOTE_ARGS_ERROR;
   
   if (!self || !slice_check(text) || !state || !slice_check(tlv_message))
-	return 1;
+	return _INOTE_ARGS_ERROR;
 
   segment_init(&segment, text);
   tlv_init(&tlv, tlv_message);
   
   tmax = segment_get_max(&segment);  
   while (((t=segment_get_buffer(&segment)) < tmax) && t) {
-	ret = 1;
+	ret = _INOTE_UNPROCESSED;
 	if (iswpunct(*t)) {
 	  switch(*t) {
 	  case L'<':
@@ -513,13 +533,12 @@ static uint32_t inote_get_type_length_value(inote_t *self, const inote_slice_t *
 	  }
 	}
 	if (ret) {
-	  ret = inote_push_text(self, &segment, state, &tlv);
+	  ret = inote_push_text(self, INOTE_TYPE_TEXT, &segment, state, &tlv);
 	  if (ret) {
 		dbg1("TODO");
 	  }
 	}
-  };
-  
+  }  
   return ret;
 }
 
@@ -557,33 +576,32 @@ void inote_delete(void *handle) {
   }
 }
 
-uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message, size_t *input_offset) {
-  uint32_t a_status = 0;
+inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message, size_t *text_left) {
+  inote_error ret = INOTE_OK;
   inote_slice_t output;
   char *inbuf;
   size_t inbytesleft = 0;
   char *outbuf;
   size_t outbytesleft = 0;
   size_t outbytesleftmax = 0;
-
   inote_t *self;
-  int ret;
+  int iconv_status;
   
   if (!handle || ( (self=(inote_t*)handle)->magic != MAGIC)) {
 	dbg("Args error (%p, %d)", handle, __LINE__);
-	return 1;
+	return INOTE_ARGS_ERROR;
   }
   if (!slice_check(text) || !slice_check(tlv_message)) {
 	dbg("Args error (%p, %d)", (void*)text, __LINE__);
-	return 1;
+	return INOTE_ARGS_ERROR;
   }  
-  if (!state)
-	return 1;
+  if (!state || !text_left)
+	return INOTE_ARGS_ERROR;
   
   if (!text->length) {
 	dbg("LEAVE (%d)", __LINE__);
 	tlv_message->length = 0;
-	return 0;
+	return INOTE_OK;
   }
 
   output.buffer = (uint8_t*)self->wchar_buf;
@@ -593,7 +611,7 @@ uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote
   
   if (get_charset(&self->cd_to_wchar[text->charset], "WCHAR_T", charset_name[text->charset])
 	  || get_charset(&self->cd_from_wchar[text->charset], charset_name[text->charset], "WCHAR_T"))  {
-	a_status = 1;
+	ret = INOTE_CHARSET_ERROR;
 	goto end0;
   }
   
@@ -602,12 +620,12 @@ uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote
   outbuf = (char *)(output.buffer);
   outbytesleft = outbytesleftmax = slice_get_free_size(&output);
 
-  ret = -1;
-  while (ret) {
-	ret = iconv(self->cd_to_wchar[text->charset],
-				&inbuf, &inbytesleft,
-				&outbuf, &outbytesleft);
-	if (!ret) {
+  iconv_status = -1;
+  while (iconv_status) {
+	iconv_status = iconv(self->cd_to_wchar[text->charset],
+						 &inbuf, &inbytesleft,
+						 &outbuf, &outbytesleft);
+	if (!iconv_status) {
 	  output.length = outbytesleftmax - outbytesleft;
 	  inote_get_type_length_value(self, &output, state, tlv_message);
 	} else if (errno == E2BIG) { /* not sufficient room at output */
@@ -625,20 +643,16 @@ uint32_t inote_get_annotated_text(void *handle, const inote_slice_t *text, inote
 		 invalid multibyte sequence in the input:
 		 unexpected error thanks to //TRANSLIT
 	  */
-	  ret = 0;
+	  iconv_status = 0;
 	}
   }
+  
   /* initial state */
-  ret = iconv(self->cd_to_wchar[text->charset], NULL, NULL, NULL, NULL);
-    
-  if (inbytesleft) {
-	dbg("Failed to convert inbytesleft=%ld bytes",  (long int)inbytesleft);
-	a_status = 1;
-  }
-
-  DebugDump("tlv: ", tlv_message->buffer, min_size(tlv_message->length, 256));
+  iconv(self->cd_to_wchar[text->charset], NULL, NULL, NULL, NULL);
+  *text_left =  inbytesleft;
+  //  DebugDump("tlv: ", tlv_message->buffer, min_size(tlv_message->length, 256));
   
  end0:
-  return a_status;
+  return ret;
 }
 

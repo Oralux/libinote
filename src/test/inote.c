@@ -8,7 +8,7 @@
 #include "inote.h"
 
 
-#define BUFFER_SIZE (2*MAX_TLV_LENGTH)
+#define BUFFER_SIZE (100*TLV_LENGTH_MAX)
 #define MAX_LANG 2
 
 enum {
@@ -21,7 +21,7 @@ void usage() {
   printf("\
 Usage: inote -p <punct_mode> -t <text>\n\
 Convert a text to a type length value byte buffer\n\
-  -p punct_mode       punctuation mode; value from 0 to 2 (see inote_punct_mode_t in inote.h)\n\
+  -p punct_mode       optional punctuation mode; value from 0 to 2 (see inote_punct_mode_t in inote.h)\n\
   -t text             utf-8 text\n\
 \n\
 EXAMPLE:\n\
@@ -36,7 +36,7 @@ int main(int argc, char **argv)
   inote_slice_t tlv_message;
   inote_state_t state;  
   size_t text_offset = 0;
-  int punct_mode = -1;
+  int punct_mode = 0;
   int opt;
   
   memset(&text, 0, sizeof(text));
@@ -61,7 +61,7 @@ int main(int argc, char **argv)
 	}
   }
   
-  if ((punct_mode == -1) || (!*text.buffer)) {
+  if (!*text.buffer) {
 	  usage();
 	  exit(1);	
   }
@@ -84,7 +84,7 @@ int main(int argc, char **argv)
   tlv_message.charset = INOTE_CHARSET_UTF_8;
 
   void *handle = inote_create();
-  inote_get_annotated_text(handle, &text, &state, &tlv_message, &text_offset);  
+  inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_offset);  
   inote_delete(handle);
   write(STDOUT_FILENO, tlv_message.buffer, tlv_message.length);
 }
