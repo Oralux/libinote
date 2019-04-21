@@ -12,8 +12,7 @@
 
 #define ICONV_ERROR ((iconv_t)-1)
 #define MAX_INPUT_BYTES 1024
-#define MAX_WCHAR 1024
-#define MAX_OUTPUT_BYTES (MAX_WCHAR*sizeof(wchar_t))
+#define MAX_WCHAR (TEXT_LENGTH_MAX*sizeof(wchar_t))
 #define MAX_PUNCT 50
 #define MAX_TOK 100
 #define MAGIC 0x7E40B171
@@ -59,7 +58,7 @@ typedef struct {
 
 typedef struct {
   inote_type_t type;
-  inote_slice_t s;
+  inote_slice_t s; // slice on a valid text buffer
 } segment_t;
 
 typedef struct {
@@ -72,10 +71,11 @@ typedef enum {
   _INOTE_OK=INOTE_OK,
   _INOTE_ARGS_ERROR=INOTE_ARGS_ERROR,
   _INOTE_CHARSET_ERROR=INOTE_CHARSET_ERROR,
-  _INOTE_START_OF_INTERNAL_ERROR=INOTE_ERROR_MAX,
+  _INOTE_INTERNAL_ERROR=INOTE_INTERNAL_ERROR,
   _INOTE_TLV_MESSAGE_FULL, // no other tlv can be added to tlv_message
   _INOTE_TLV_FULL, // the current tlv is full
   _INOTE_UNPROCESSED,
+  _INOTE_UNEMPTIED_BUFFER, // the internal wchar_t buffer can't be fully processed
 } _inote_error;
 
 static size_t min_size(size_t a, size_t b) {
@@ -88,7 +88,7 @@ static bool slice_check(const inote_slice_t *self) {
 		  && (self->charset > INOTE_CHARSET_UNDEFINED) && (self->charset < MAX_CHARSET));
 }
 
-static size_t slice_get_free_size(inote_slice_t *self) {
+static size_t slice_get_free_size(const inote_slice_t *self) {
   size_t s = 0;
   if (self && self->buffer) {
 	uint8_t *free_byte = self->buffer + self->length;
@@ -99,7 +99,7 @@ static size_t slice_get_free_size(inote_slice_t *self) {
   return s;
 }
 
-static uint8_t *slice_get_free_byte(inote_slice_t *self) {
+static uint8_t *slice_get_free_byte(const inote_slice_t *self) {
   uint8_t *free_byte = NULL;
   if (self && self->buffer) {
 	free_byte = self->buffer + self->length;
@@ -535,10 +535,16 @@ static _inote_error inote_get_type_length_value(inote_t *self, const inote_slice
 	if (ret) {
 	  ret = inote_push_text(self, INOTE_TYPE_TEXT, &segment, state, &tlv);
 	  if (ret) {
-		dbg1("TODO");
+		break;
 	  }
 	}
-  }  
+  }
+  
+  if (!ret && (t=segment_get_buffer(&segment)) < tmax) {
+	dbg1("Error: wchar_t text not fully processed!");
+	ret = _INOTE_UNEMPTIED_BUFFER;
+  }
+
   return ret;
 }
 
@@ -585,7 +591,7 @@ inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, i
   size_t outbytesleft = 0;
   size_t outbytesleftmax = 0;
   inote_t *self;
-  int iconv_status;
+  int iconv_status; // nb of non reversible conv char or -1
   
   if (!handle || ( (self=(inote_t*)handle)->magic != MAGIC)) {
 	dbg("Args error (%p, %d)", handle, __LINE__);
@@ -595,6 +601,17 @@ inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, i
 	dbg("Args error (%p, %d)", (void*)text, __LINE__);
 	return INOTE_ARGS_ERROR;
   }  
+
+  if (slice_get_free_size(text) > TEXT_LENGTH_MAX) {
+	dbg("Args error (%p, %d)", (void*)text, __LINE__);
+	return INOTE_ARGS_ERROR;
+  }  
+
+  if (slice_get_free_size(tlv_message) > TLV_MESSAGE_LENGTH_MAX) {
+	dbg("Args error (%p, %d)", (void*)text, __LINE__);
+	return INOTE_ARGS_ERROR;
+  }  
+
   if (!state || !text_left)
 	return INOTE_ARGS_ERROR;
   
@@ -615,44 +632,48 @@ inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, i
 	goto end0;
   }
   
+  *text_left = 0;
+
   inbuf = (char *)(text->buffer);
   inbytesleft = text->length;
   outbuf = (char *)(output.buffer);
   outbytesleft = outbytesleftmax = slice_get_free_size(&output);
 
   iconv_status = -1;
-  while (iconv_status) {
-	iconv_status = iconv(self->cd_to_wchar[text->charset],
-						 &inbuf, &inbytesleft,
-						 &outbuf, &outbytesleft);
-	if (!iconv_status) {
-	  output.length = outbytesleftmax - outbytesleft;
-	  inote_get_type_length_value(self, &output, state, tlv_message);
-	} else if (errno == E2BIG) { /* not sufficient room at output */
-	  output.length = outbytesleftmax - outbytesleft;
-	  inote_get_type_length_value(self, &output, state, tlv_message);
-	  output.length = 0;
-	  outbuf = (char *)(output.buffer);
-	  outbytesleft = outbytesleftmax;
-	} else {
-	  /* 
-		 EINVAL: 
-		 incomplete multibyte sequence in the input:
-		 unexpected error, complete sequences are expected
-		 EILSEQ:
-		 invalid multibyte sequence in the input:
-		 unexpected error thanks to //TRANSLIT
-	  */
-	  iconv_status = 0;
-	}
+  iconv_status = iconv(self->cd_to_wchar[text->charset],
+					   &inbuf, &inbytesleft,
+					   &outbuf, &outbytesleft);
+  if (!iconv_status) {
+	output.length = outbytesleftmax - outbytesleft;
+	ret = inote_get_type_length_value(self, &output, state, tlv_message);
+  } else if ((iconv_status != -1)
+			 || (errno == E2BIG)) /* not sufficient room at output */ {
+	output.length = outbytesleftmax - outbytesleft;
+	ret = inote_get_type_length_value(self, &output, state, tlv_message);
+	output.length = 0;
+	outbuf = (char *)(output.buffer);
+	outbytesleft = outbytesleftmax;
+  } else {
+	/* 
+	   EINVAL: 
+	   incomplete multibyte sequence in the input:
+	   unexpected error, complete sequences are expected
+	   EILSEQ:
+	   invalid multibyte sequence in the input:
+	   unexpected error thanks to //TRANSLIT
+	*/
+	iconv_status = 0;
   }
   
   /* initial state */
   iconv(self->cd_to_wchar[text->charset], NULL, NULL, NULL, NULL);
-  *text_left =  inbytesleft;
+  *text_left +=  inbytesleft;
   //  DebugDump("tlv: ", tlv_message->buffer, min_size(tlv_message->length, 256));
   
  end0:
+  if (ret > INOTE_INTERNAL_ERROR) {
+	ret = INOTE_INTERNAL_ERROR;
+  }
   return ret;
 }
 

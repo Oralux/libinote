@@ -24,8 +24,6 @@ typedef enum {
   INOTE_TYPE_ANNOTATION=INOTE_TYPE_TEXT+(1<<3),
 } inote_type_t;
 
-#define INOTE_ANNOTATION
-
 typedef enum {
   INOTE_PUNCT_MODE_NONE=0, /* does not pronounce punctuation */
   INOTE_PUNCT_MODE_ALL=1, /* pronounce all punctuation character */
@@ -82,39 +80,46 @@ typedef enum {
   INOTE_OK=0,
   INOTE_ARGS_ERROR,
   INOTE_CHARSET_ERROR,
-  INOTE_ERROR_MAX,
+  INOTE_INTERNAL_ERROR,
 } inote_error;
+
+#define TEXT_LENGTH_MAX 1024
+#define TLV_MESSAGE_LENGTH_MAX (3*TEXT_LENGTH_MAX)
 
 void *inote_create();
 void inote_delete(void *handle);
 
 /*
+  The text and tlv_message slices are pre-allocated by the caller,
+  with the max size details below.
+
   text: null terminated text (raw or enriched with SSML tags or ECI
-  annotations)
-  text->length does not count the terminator
-  if text->charset defines multibytes sequences, then text-buffer must
-  supply complete sequences
+  annotations).
+  text->length does not count the terminator. 
+  text->length <= TEXT_LENGTH_MAX
 
   state: punctuation, current language,...
 
-  tlv: type_length_value formated data; text sections encoded in the
-  indicated charset
+  tlv_message: type_length_value formated data; text sections encoded
+  in the indicated charset
+  tlv_message->length <= TLV_MESSAGE_LENGTH_MAX
+
   text_left: number of bytes not yet consumed in text->buffer 
+
   RETURN: 0 if no error
   
   Example
   input: text="`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"  
   output:
+  00000000  01 10 55 6e 20 3c c3 a9  6c c3 a9 70 68 61 6e 74  |..Un <..l..phant|
+  00000010  3e 20 05 02 28 31 05 01  29                       |> ..(1..)|
   
   |-------------------+--------+------------------|
   | Type              | Length | Value            |
   |-------------------+--------+------------------|
-  | some punctuation  |      3 | "()?"            |
-  | utf8 text         |     16 | "Un <éléphant> " |
-  | found punctuation |      0 |                  |
-  | utf8 text         |      2 | "(1"             |
-  | found punctuation |      0 |                  |
-  | utf8 text         |      1 | ")"              |
+  | text              |     16 | "Un <éléphant> " |
+  | text+punctuation  |      2 | "(1"             |
+  | text+punctuation  |      1 | ")"              |
   |-------------------+--------+------------------|
 
 */

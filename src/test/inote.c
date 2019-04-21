@@ -5,10 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include "inote.h"
 
-
-#define BUFFER_SIZE (100*TLV_LENGTH_MAX)
 #define MAX_LANG 2
 
 enum {
@@ -19,13 +21,16 @@ enum {
 
 void usage() {
   printf("\
-Usage: inote -p <punct_mode> -t <text>\n\
+Usage: inote [-p <punct_mode>] [-i inputfile | -t <text>] [-o outputfile]\n\
 Convert a text to a type length value byte buffer\n\
-  -p punct_mode       optional punctuation mode; value from 0 to 2 (see inote_punct_mode_t in inote.h)\n\
-  -t text             utf-8 text\n\
+  -i inputfile    read text from file\n\
+  -o outputfile   write tlv to this file\n\
+  -p punct_mode   optional punctuation mode; value from 0 to 2 (see inote_punct_mode_t in inote.h)\n\
+  -t text         utf-8 text\n\
 \n\
 EXAMPLE:\n\
 inote -p 0 -t \"Hello, world\" > tlv\n\
+inote -i file.txt -o file.tlv\n\
 \n\
 ");
 }
@@ -37,22 +42,45 @@ int main(int argc, char **argv)
   inote_state_t state;  
   size_t text_offset = 0;
   int punct_mode = 0;
-  int opt;
+  int opt; 
+  FILE *fdi = NULL;
+  int output = STDOUT_FILENO;
+  int ret = 0;
   
   memset(&text, 0, sizeof(text));
   memset(&tlv_message, 0, sizeof(tlv_message));
   memset(&state, 0, sizeof(state));
-  text.buffer = calloc(1, BUFFER_SIZE);
+
+  text.buffer = calloc(1, TEXT_LENGTH_MAX+1);
   *text.buffer = 0;
   
-  while ((opt = getopt(argc, argv, "p:t:")) != -1) {
+  while ((opt = getopt(argc, argv, "i:o:p:t:")) != -1) {
 	switch (opt) {
+	case 'i':
+	  if (fdi)
+		fclose(fdi);
+	  fdi = fopen(optarg, "r");
+	  if (!fdi) {
+		perror(NULL);
+		exit(1);
+	  }
+	  break;
+	case 'o':
+	  output = creat(optarg, S_IRWXU);
+	  if (output==-1) {
+		perror(NULL);
+		exit(1);
+	  }
+	  break;
 	case 'p':
 	  punct_mode = atoi(optarg);
 	  break;
 	case 't':
-	  strncpy(text.buffer, optarg, BUFFER_SIZE-1);
-	  text.buffer[BUFFER_SIZE-1] = 0;
+	  strncpy(text.buffer, optarg, TEXT_LENGTH_MAX);
+	  text.buffer[TEXT_LENGTH_MAX] = 0;
+	  text.length = strlen(text.buffer);
+	  text.charset = INOTE_CHARSET_UTF_8;
+	  text.end_of_buffer = text.buffer + TEXT_LENGTH_MAX;	  
 	  break;
 	default:
 	  usage();
@@ -61,15 +89,11 @@ int main(int argc, char **argv)
 	}
   }
   
-  if (!*text.buffer) {
+  if (!*text.buffer && !fdi) {
 	  usage();
 	  exit(1);	
   }
   
-  text.length = strlen(text.buffer);
-  text.charset = INOTE_CHARSET_UTF_8;
-  text.end_of_buffer = text.buffer + BUFFER_SIZE;
-
   //  state.punct_mode = INOTE_PUNCT_MODE_NONE;
   state.punct_mode = (inote_punct_mode_t)punct_mode;
   state.expected_lang = calloc(MAX_LANG, sizeof(*state.expected_lang));
@@ -79,12 +103,31 @@ int main(int argc, char **argv)
   //  state.ssml = 0;
   state.annotation = 1;
     
-  tlv_message.buffer = calloc(1, BUFFER_SIZE);
-  tlv_message.end_of_buffer = tlv_message.buffer + BUFFER_SIZE;
+  tlv_message.buffer = calloc(1, TLV_MESSAGE_LENGTH_MAX);
+  tlv_message.end_of_buffer = tlv_message.buffer + TLV_MESSAGE_LENGTH_MAX;
   tlv_message.charset = INOTE_CHARSET_UTF_8;
 
   void *handle = inote_create();
-  inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_offset);  
+  if (!fdi) {
+	ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_offset);
+  } else {
+	while(!ret) {
+	  size_t len = fread(text.buffer, 1, TEXT_LENGTH_MAX, fdi);
+	  if (!len)
+		break;
+	  text.buffer[len] = 0;
+	  text.length = len;
+	  text.charset = INOTE_CHARSET_UTF_8;
+	  text.end_of_buffer = text.buffer + len;	  
+	  ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_offset);
+	  write(output, tlv_message.buffer, tlv_message.length);
+	  tlv_message.length = 0;
+	}
+	fclose(fdi);
+  }
+  if (ret) {
+	printf("error = %d\n", ret);
+  }
   inote_delete(handle);
-  write(STDOUT_FILENO, tlv_message.buffer, tlv_message.length);
+  write(output, tlv_message.buffer, tlv_message.length);
 }
