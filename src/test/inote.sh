@@ -62,18 +62,18 @@ convertFile() {
 PUNCT_MODE=1
 # PUNCT_MODE=2
 
-# if [ "$1" = "-g" ]; then
-# 	text="${testArray[0]}"
-# 	gdb -ex "set args -p $PUNCT_MODE -t '${testArray[-1]}'" -x gdb_commands ./inote
-# else
-# 	for i in "${testArray[@]}"; do
-# 		convertText "$i" $PUNCT_MODE
-# 	done
-# fi
-
 if [ "$1" = "-g" ]; then
-	gdb -ex "set args -p $PUNCT_MODE -i '$file_utf_8' -o '$file_utf_8.tlv'" -x gdb_commands ./inote
+	text="${testArray[0]}"
+	gdb -ex "set args -p $PUNCT_MODE -t '${testArray[-1]}'" -x gdb_commands ./inote
 else
-	convertFile "$file_utf_8" $PUNCT_MODE
+	for i in "${testArray[@]}"; do
+		convertText "$i" $PUNCT_MODE
+	done
 fi
+
+# if [ "$1" = "-g" ]; then
+# 	gdb -ex "set args -p $PUNCT_MODE -i '$file_utf_8' -o '$file_utf_8.tlv'" -x gdb_commands ./inote
+# else
+# 	convertFile "$file_utf_8" $PUNCT_MODE
+# fi
 

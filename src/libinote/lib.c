@@ -294,8 +294,15 @@ static _inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t
   tmax = segment_get_max(segment);
   // the first char is considered as text
   t++;
-  while ((t < tmax) && !iswpunct(*t)) {
-	t++;
+  if (first == INOTE_TYPE_ANNOTATION) {
+	while ((t < tmax) && (*t != L' ')) {
+	  t++;
+	}
+	t++; // + white space
+  } else {
+	while ((t < tmax) && !iswpunct(*t)) {
+	  t++;
+	}
   }
 
   segment->s.length = (uint8_t*)t - (uint8_t*)t0;

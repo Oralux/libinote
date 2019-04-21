@@ -44,11 +44,11 @@ type = INOTE_TYPE_TEXT
 
 Punctuation character (to be said)
 type = INOTE_TYPE_PUNCTUATION
-length = 1 + remaining text (first char=punctuation cra, followed by text) 
+length = 1 + remaining text (first char=punctuation char, followed by text) 
 
 Annotation
 type = INOTE_TYPE_ANNOTATION
-length = annotation + remaining text
+length = annotation length
 */
 typedef struct {
   uint8_t type;
