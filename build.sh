@@ -59,7 +59,7 @@ while true; do
     -c|--clean) CLEAN=1; shift;;
     -d|--debug) export DBG_FLAGS="-ggdb -DDEBUG"; export STRIP=test; shift;;
     -h|--help) HELP=1; shift;;
-    -i|--install) INST=$2; shift 2;;
+    -i|--install) INSTALL=$2; shift 2;;
     -m|--mach) ARCH=$2; shift 2;;
     -t|--test) TEST=1; shift;;
     --) shift; break;;
