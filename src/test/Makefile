@@ -17,4 +17,4 @@ clean:
 	rm -f *o *~ $(TARGET)
 
 install:
-	install -D -m 755 $(TARGET) $(DESTDIR)/bin
+	mkdir -p $(DESTDIR)/bin; install -D -m 755 $(TARGET) $(DESTDIR)/bin
