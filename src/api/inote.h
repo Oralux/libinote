@@ -80,7 +80,13 @@ typedef enum {
   INOTE_OK=0,
   INOTE_ARGS_ERROR,
   INOTE_CHARSET_ERROR,
-  INOTE_INTERNAL_ERROR,
+  INOTE_INVALID_MULTIBYTE,
+  INOTE_INCOMPLETE_MULTIBYTE,
+  INOTE_TLV_MESSAGE_FULL, // no other tlv can be added to tlv_message
+  INOTE_TLV_FULL, // the current tlv is full
+  INOTE_UNPROCESSED,
+  INOTE_UNEMPTIED_BUFFER, // the internal wchar_t buffer can't be fully processed
+  INOTE_ERRNO=0x1000 // return 0x1000 + errno  
 } inote_error;
 
 #define TEXT_LENGTH_MAX 1024

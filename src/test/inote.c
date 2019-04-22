@@ -3,6 +3,7 @@
 // <--
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
@@ -40,7 +41,7 @@ int main(int argc, char **argv)
   inote_slice_t text;
   inote_slice_t tlv_message;
   inote_state_t state;  
-  size_t text_offset = 0;
+  size_t text_left = 0;
   int punct_mode = 0;
   int opt; 
   FILE *fdi = NULL;
@@ -109,9 +110,19 @@ int main(int argc, char **argv)
 
   void *handle = inote_create();
   if (!fdi) {
-	ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_offset);
+	ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
+	switch (ret) {
+	case INOTE_INCOMPLETE_MULTIBYTE:
+	case INOTE_INVALID_MULTIBYTE:
+	  text.length -= text_left;
+	  ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
+	  break;
+	default:
+	  break;
+	}
   } else {
-	while(!ret) {
+	bool loop = true;
+	while(loop) {
 	  size_t len = fread(text.buffer, 1, TEXT_LENGTH_MAX, fdi);
 	  if (!len)
 		break;
@@ -119,7 +130,30 @@ int main(int argc, char **argv)
 	  text.length = len;
 	  text.charset = INOTE_CHARSET_UTF_8;
 	  text.end_of_buffer = text.buffer + len;	  
-	  ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_offset);
+	  ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
+	  switch (ret) {
+	  case INOTE_INVALID_MULTIBYTE: {
+		int ret2;
+		text.length -= text_left;
+		text.buffer[text.length] = '?';
+		text.length++;
+		fseek(fdi, -text_left+1, SEEK_CUR);
+		ret2 = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
+		loop = (!ret2);
+	  }
+		break;
+	  case INOTE_INCOMPLETE_MULTIBYTE: {
+		int ret2;
+		text.length -= text_left;
+		fseek(fdi, -text_left, SEEK_CUR);
+		ret2 = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
+		loop = (!ret2);
+	  }
+		break;
+	  default:
+		loop = false;
+		break;
+	  }
 	  write(output, tlv_message.buffer, tlv_message.length);
 	  tlv_message.length = 0;
 	}

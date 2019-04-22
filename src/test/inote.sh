@@ -1,6 +1,7 @@
 #!/bin/bash
 
-#touch /tmp/libinote.ok
+touch /tmp/libinote.ok
+rm -f /tmp/libinote.log.*
 
 testFileUrl="http://abu.cnam.fr/cgi-bin/donner_unformated?nddp1"
 testFileDest=nddp1.txt.iso-8859-1
@@ -11,69 +12,98 @@ if [ ! -e "$file_utf_8" ]; then
 	iconv -f iso-8859-1 -t utf-8 -o "$file_utf_8" "$testFileDest"  
 fi
 
+T127="ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+T256=${T127}${T127}éé
+
 unset testArray
 i=0
+
+testLabel[$i]="utf-8 text"
 testArray[$((i++))]="Un éléphant"
+
+testLabel[$i]="utf-8 text + filtered annotation + tag + punctuation"
 testArray[$((i++))]="\`gfa1 \`gfa2 \`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"
+
+testLabel[$i]="utf-8 text + annotation"
 testArray[$((i++))]="\`v1 Un \`v2 éléphant"
 
-# 127 é (2 bytes (header) + 254 bytes = tlv element)
-testArray[$((i++))]="ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+testLabel[$i]="1 tlv for 127 é (header=2 bytes + value=254 bytes)"
+testArray[$((i++))]=${T127}
 
-# 2 tlv: 127 é + a
-# tlv#1: 127 é
-# tlv#2: a 
-testArray[$((i++))]="éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééa"
+testLabel[$i]="2 tlv: 127 é + a"
+testArray[$((i++))]=${T127}a
 
-# 2 tlv, last utf-8 potentially splitted: a + 127 é
-# tlv#1: a + 126 é
-# tlv#2: é 
-testArray[$((i++))]="aééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+testLabel[$i]="2 tlv, last utf-8 potentially splitted: a + 127 é"
+testArray[$((i++))]=a${T127}
 
-# 254 é
-testArray[$((i++))]="éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+testLabel[$i]="1025 bytes: a + 512 é"
+testArray[$((i++))]=$(echo -n "a$T256$T256")
 
-# 256 é
-testArray[$((i++))]="éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+testLabel[$i]="6 bytes: é + 2 erroneous utf-8 bytes + é"
+testArray[$((i++))]=$(echo -en "é\xca\xfeé")
 
+testLabel[$i]="256 bytes: 127 é + 2 erroneous bytes"
+testArray[$((i++))]=$(echo -en "${T127}\xca\xfe")
+
+testLabel[$i]="257 bytes: a + 127 é + 2 erroneous bytes"
+testArray[$((i++))]=$(echo -en "a${T127}\xca\xfe")
 
 convertText() {
-	TEXT="$1"
-	PUNCT_MODE="$2"
-#	rm -f /tmp/libinote.log.*
-	echo "----------------------------------"
+	NUM=$1
+	LABEL=$2
+	TEXT="$3"
+	PUNCT_MODE="$4"
+	echo "* $NUM. $LABEL"
 	echo -e "text:\n$TEXT"
 	echo -e "tlv:"
 	./inote -p $PUNCT_MODE -t "$TEXT" | hexdump -Cv
 }
 
 convertFile() {
-	FILE="$1"
-	PUNCT_MODE="$2"
-#	rm -f /tmp/libinote.log.*
-	echo "----------------------------------"
-	echo -e "file:\n$FILE"
-	echo -e "tlv:"
+	NUM=$1
+	LABEL=$2
+	FILE=$3
+	PUNCT_MODE=$4
+	echo
+	echo "* $NUM. $LABEL"
+	echo "text:"
+	cat "$FILE"
+	echo
+	echo "tlv:"
 	./inote -p $PUNCT_MODE -i "$FILE" -o "$FILE.tlv"
-	ls -l "$FILE" "$FILE.tlv"
+	hexdump -Cv "$FILE.tlv"
 }
 
 #PUNCT_MODE=0
 PUNCT_MODE=1
 # PUNCT_MODE=2
 
+# if [ "$1" = "-g" ]; then
+# 	text="${testArray[0]}"
+# 	gdb -ex "set args -p $PUNCT_MODE -t '${testArray[-1]}'" -x gdb_commands ./inote
+# else
+#	j=0
+# 	for i in "${testArray[@]}"; do
+#		j=$((j+1))
+#
+# 		convertText $j "${testLabel[$j]}" "$i" $PUNCT_MODE
+# 	done
+# fi
+
+TMPFILE=$(mktemp)
+
 if [ "$1" = "-g" ]; then
-	text="${testArray[0]}"
-	gdb -ex "set args -p $PUNCT_MODE -t '${testArray[-1]}'" -x gdb_commands ./inote
+	FILE="${testArray[-1]}"
+	gdb -ex "set args -p $PUNCT_MODE -i '$FILE' -o '$FILE.tlv'" -x gdb_commands ./inote
 else
+	j=0
 	for i in "${testArray[@]}"; do
-		convertText "$i" $PUNCT_MODE
+		echo -en "$i" > $TMPFILE
+		rm -f "$FILE.tlv"
+		convertFile $j "${testLabel[$j]}" "$TMPFILE" $PUNCT_MODE
+		j=$((j+1))
 	done
 fi
 
-# if [ "$1" = "-g" ]; then
-# 	gdb -ex "set args -p $PUNCT_MODE -i '$file_utf_8' -o '$file_utf_8.tlv'" -x gdb_commands ./inote
-# else
-# 	convertFile "$file_utf_8" $PUNCT_MODE
-# fi
+# cat /tmp/libinote.log.*
 
