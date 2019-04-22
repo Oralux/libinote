@@ -1,4 +1,4 @@
-// --> For getop
+// --> For getopt
 #define _XOPEN_SOURCE 1
 // <--
 #include <stdio.h>
@@ -22,16 +22,16 @@ enum {
 
 void usage() {
   printf("\
-Usage: inote [-p <punct_mode>] [-i inputfile | -t <text>] [-o outputfile]\n\
-Convert a text to a type length value byte buffer\n\
+Usage: text2tlv [-p <punct_mode>] [-i inputfile | -t <text>] [-o outputfile]\n\
+Convert a text to a type-length-value byte buffer\n\
   -i inputfile    read text from file\n\
   -o outputfile   write tlv to this file\n\
   -p punct_mode   optional punctuation mode; value from 0 to 2 (see inote_punct_mode_t in inote.h)\n\
   -t text         utf-8 text\n\
 \n\
 EXAMPLE:\n\
-inote -p 0 -t \"Hello, world\" > tlv\n\
-inote -i file.txt -o file.tlv\n\
+text2tlv -p 0 -t \"Hello, world\" > tlv\n\
+text2tlv -i file.txt -o file.tlv\n\
 \n\
 ");
 }
@@ -160,8 +160,11 @@ int main(int argc, char **argv)
 	fclose(fdi);
   }
   if (ret) {
-	printf("error = %d\n", ret);
+	printf("%s: error = %d\n", __func__, ret);
   }
   inote_delete(handle);
   write(output, tlv_message.buffer, tlv_message.length);
+  tlv_message.length = 0;
+
+  return ret;
 }

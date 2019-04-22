@@ -56,7 +56,7 @@ convertText() {
 	echo "* $NUM. $LABEL"
 	echo -e "text:\n$TEXT"
 	echo -e "tlv:"
-	./inote -p $PUNCT_MODE -t "$TEXT" | hexdump -Cv
+	./text2tlv -p $PUNCT_MODE -t "$TEXT" | hexdump -Cv
 }
 
 convertFile() {
@@ -70,8 +70,10 @@ convertFile() {
 	cat "$FILE"
 	echo
 	echo "tlv:"
-	./inote -p $PUNCT_MODE -i "$FILE" -o "$FILE.tlv"
+	./text2tlv -p $PUNCT_MODE -i "$FILE" -o "$FILE.tlv"
+	./tlv2text -i "$FILE.tlv" -o "$FILE.txt"
 	hexdump -Cv "$FILE.tlv"
+	hexdump -Cv "$FILE.txt"
 }
 
 #PUNCT_MODE=0
@@ -99,7 +101,7 @@ else
 	j=0
 	for i in "${testArray[@]}"; do
 		echo -en "$i" > $TMPFILE
-		rm -f "$FILE.tlv"
+#		rm -f "$FILE.tlv" "$FILE.txt" 
 		convertFile $j "${testLabel[$j]}" "$TMPFILE" $PUNCT_MODE
 		j=$((j+1))
 	done

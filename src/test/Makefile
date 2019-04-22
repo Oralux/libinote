@@ -1,16 +1,20 @@
-CFLAGS += $(DEBUG) -I../api -std=c99
+TARGET = text2tlv tlv2text
 CC = gcc
+CFLAGS += $(DEBUG) -I../api -std=c99
+LDFLAGS = -L $(DESTDIR)/lib
+LDLIBS = -linote
 DESTDIR ?= ../../build/x86_64/usr/
 
-inote:	inote.o
+text2tlv:	text2tlv.o
 	$(CC) -o $(@) $(^) -L $(DESTDIR)/lib -linote
 
-all:	inote
+tlv2text:	tlv2text.o
+	$(CC) -o $(@) $(^) -L $(DESTDIR)/lib -linote
+
+all: $(TARGET)
 
 clean:
-	rm -f inote *o *~
+	rm -f *o *~ $(TARGET)
 
 install:
-	install -d $(DESTDIR)/bin
-	install -m 755 inote inote.sh $(DESTDIR)/bin
-
+	install -D -m 755 $(TARGET) $(DESTDIR)/bin

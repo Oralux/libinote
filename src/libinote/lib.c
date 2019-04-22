@@ -67,14 +67,22 @@ typedef struct {
   inote_tlv_t *previous_header;
 } tlv_t;
 
+uint8_t *inote_tlv_get_value(const inote_tlv_t *self) {
+  return  self ? (uint8_t *)self + TLV_HEADER_LENGTH_MAX : NULL;
+}
+
 static size_t min_size(size_t a, size_t b) {
   return (a<b) ? a : b;
+}
+
+static bool cb_check(const inote_cb_t *self) {
+  return (self && self->add_text && self->add_punctuation && self->add_annotation && self->add_charset);
 }
 
 static bool slice_check(const inote_slice_t *self) {
   return (self && self->buffer
 		  && (self->buffer + self->length <= self->end_of_buffer)
-		  && (self->charset > INOTE_CHARSET_UNDEFINED) && (self->charset < MAX_CHARSET));
+		  && (self->charset >= INOTE_CHARSET_UNDEFINED) && (self->charset < MAX_CHARSET));
 }
 
 static size_t slice_get_free_size(const inote_slice_t *self) {
@@ -683,3 +691,45 @@ inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, i
   return ret;
 }
 
+inote_error inote_convert_tlv_to_text(inote_slice_t *tlv_message, inote_cb_t *cb) {
+  inote_error ret = INOTE_OK;
+  inote_tlv_t *tlv;
+  uint8_t *t, *tmax;
+
+  if (!cb_check(cb)) {
+	dbg("Args error (%p, %d)", (void *)cb, __LINE__);
+	return INOTE_ARGS_ERROR;
+  }
+  
+  if (!slice_check(tlv_message)) {
+	dbg("Args error (%p, %d)", (void*)tlv_message, __LINE__);
+	return INOTE_ARGS_ERROR;
+  }  
+
+  tmax = slice_get_last_byte(tlv_message) + 1 - TLV_HEADER_LENGTH_MAX;
+  t = tlv_message->buffer;
+  while ((t <= tmax) && !ret) {
+	tlv = (inote_tlv_t*)t;
+	switch (tlv->type) {
+	case INOTE_TYPE_ANNOTATION:
+	  cb->add_annotation(tlv, cb->user_data);
+	  break;
+	case INOTE_TYPE_CHARSET:
+	  cb->add_charset(tlv, cb->user_data);
+	  break;
+	case INOTE_TYPE_PUNCTUATION:
+	  cb->add_punctuation(tlv, cb->user_data);
+	  break;
+	case INOTE_TYPE_TEXT:
+	  cb->add_text(tlv, cb->user_data);
+	  break;
+	default:
+	  dbg("wrong tlv (%p)", (void*)tlv);
+	  ret = INOTE_TLV_ERROR;
+	  break;
+	}
+	t += TLV_HEADER_LENGTH_MAX + (uint8_t)tlv->length;
+  }
+
+  return ret;
+}

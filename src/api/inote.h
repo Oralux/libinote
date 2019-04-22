@@ -15,7 +15,6 @@ typedef enum {
   INOTE_CHARSET_WCHAR_T,
 } inote_charset_t;
 
-
 typedef enum {
   INOTE_TYPE_UNDEFINED,
   INOTE_TYPE_TEXT=(1<<0),
@@ -59,6 +58,8 @@ typedef struct {
 #define TLV_HEADER_LENGTH_MAX sizeof(inote_tlv_t)
 #define TLV_VALUE_LENGTH_MAX (TLV_LENGTH_MAX - TLV_HEADER_LENGTH_MAX)
 
+uint8_t *inote_tlv_get_value(const inote_tlv_t *self);
+
 typedef struct {
   uint8_t *buffer; 
   size_t length; /* data length in bytes */
@@ -86,8 +87,23 @@ typedef enum {
   INOTE_TLV_FULL, // the current tlv is full
   INOTE_UNPROCESSED,
   INOTE_UNEMPTIED_BUFFER, // the internal wchar_t buffer can't be fully processed
+  INOTE_TLV_ERROR,
+  INOTE_IO_ERROR,
   INOTE_ERRNO=0x1000 // return 0x1000 + errno  
 } inote_error;
+
+typedef inote_error (*inote_add_annotation_t)(inote_tlv_t *tlv, void *user_data);  
+typedef inote_error (*inote_add_charset_t)(inote_tlv_t *tlv, void *user_data);  
+typedef inote_error (*inote_add_punct_t)(inote_tlv_t *tlv, void *user_data);  
+typedef inote_error (*inote_add_text_t)(inote_tlv_t *tlv, void *user_data);  
+
+typedef struct {
+  inote_add_annotation_t add_annotation;
+  inote_add_charset_t add_charset;
+  inote_add_punct_t add_punctuation;
+  inote_add_text_t add_text;
+  void *user_data;
+} inote_cb_t;
 
 #define TEXT_LENGTH_MAX 1024
 #define TLV_MESSAGE_LENGTH_MAX (3*TEXT_LENGTH_MAX)
@@ -106,8 +122,7 @@ void inote_delete(void *handle);
 
   state: punctuation, current language,...
 
-  tlv_message: type_length_value formated data; text sections encoded
-  in the indicated charset
+  tlv_message: type_length_value formated data
   tlv_message->length <= TLV_MESSAGE_LENGTH_MAX
 
   text_left: number of bytes not yet consumed in text->buffer 
@@ -131,7 +146,34 @@ void inote_delete(void *handle);
 */
   inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message, size_t *text_left);
 
-  inote_error inote_convert_tlv_to_text(void *handle, inote_slice_t *tlv_message, inote_state_t *state, const inote_slice_t *text, size_t *tlva_offset);
+/*
+  tlv_message and cb are supplied by the caller.
+
+  tlv_message: type_length_value formated data
+  tlv_message->length: no implicit limit on the length
+
+  cb: callback to be called according to the tlv type
+
+  RETURN: 0 if no error
+  
+  Example
+  input:
+  00000000  01 10 55 6e 20 3c c3 a9  6c c3 a9 70 68 61 6e 74  |..Un <..l..phant|
+  00000010  3e 20 05 02 28 31 05 01  29                       |> ..(1..)|
+  
+  |-------------------+--------+------------------|
+  | Type              | Length | Value            |
+  |-------------------+--------+------------------|
+  | text              |     16 | "Un <éléphant> " |
+  | text+punctuation  |      2 | "(1"             |
+  | text+punctuation  |      1 | ")"              |
+  |-------------------+--------+------------------|
+
+  possible output (according to the supplied callbacks): 
+  text="Un <éléphant> (1)"  
+
+*/
+  inote_error inote_convert_tlv_to_text(inote_slice_t *tlv_message, inote_cb_t *cb);
 
 
 #endif
