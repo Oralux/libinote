@@ -47,12 +47,15 @@ int main(int argc, char **argv)
   FILE *fdi = NULL;
   int output = STDOUT_FILENO;
   int ret = 0;
+  uint8_t text_buffer[TEXT_LENGTH_MAX+1];
+  uint32_t state_expected_lang[MAX_LANG];
+  uint8_t tlv_message_buffer[TLV_MESSAGE_LENGTH_MAX];
   
   memset(&text, 0, sizeof(text));
   memset(&tlv_message, 0, sizeof(tlv_message));
   memset(&state, 0, sizeof(state));
 
-  text.buffer = calloc(1, TEXT_LENGTH_MAX+1);
+  text.buffer = text_buffer;
   *text.buffer = 0;
   
   while ((opt = getopt(argc, argv, "i:o:p:t:")) != -1) {
@@ -97,14 +100,14 @@ int main(int argc, char **argv)
   
   //  state.punct_mode = INOTE_PUNCT_MODE_NONE;
   state.punct_mode = (inote_punct_mode_t)punct_mode;
-  state.expected_lang = calloc(MAX_LANG, sizeof(*state.expected_lang));
+  state.expected_lang = state_expected_lang;
   state.expected_lang[0] = ENGLISH;
   state.expected_lang[1] = FRENCH;
   state.max_expected_lang = MAX_LANG;
   //  state.ssml = 0;
   state.annotation = 1;
     
-  tlv_message.buffer = calloc(1, TLV_MESSAGE_LENGTH_MAX);
+  tlv_message.buffer = tlv_message_buffer;
   tlv_message.end_of_buffer = tlv_message.buffer + TLV_MESSAGE_LENGTH_MAX;
   tlv_message.charset = INOTE_CHARSET_UTF_8;
 
