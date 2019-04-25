@@ -81,7 +81,6 @@ int main(int argc, char **argv)
 	  break;
 	case 't':
 	  strncpy(text.buffer, optarg, TEXT_LENGTH_MAX);
-	  text.buffer[TEXT_LENGTH_MAX] = 0;
 	  text.length = strlen(text.buffer);
 	  text.charset = INOTE_CHARSET_UTF_8;
 	  text.end_of_buffer = text.buffer + TEXT_LENGTH_MAX;	  
@@ -129,7 +128,6 @@ int main(int argc, char **argv)
 	  size_t len = fread(text.buffer, 1, TEXT_LENGTH_MAX, fdi);
 	  if (!len)
 		break;
-	  text.buffer[len] = 0;
 	  text.length = len;
 	  text.charset = INOTE_CHARSET_UTF_8;
 	  text.end_of_buffer = text.buffer + len;	  

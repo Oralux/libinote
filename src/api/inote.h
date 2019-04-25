@@ -115,9 +115,8 @@ void inote_delete(void *handle);
   The text and tlv_message slices are pre-allocated by the caller,
   with the max size details below.
 
-  text: null terminated text (raw or enriched with SSML tags or ECI
-  annotations).
-  text->length does not count the terminator. 
+  text: raw text or enriched with SSML tags or ECI annotations.
+  null terminator not needed.
   text->length <= TEXT_LENGTH_MAX
 
   state: punctuation, current language,...
