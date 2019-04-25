@@ -75,15 +75,15 @@ esac
 
 [ -n "$HELP" ] && usage && exit 0
 
-cleanup
-[ -n "$CLEAN" ] && exit 0
-
 cd "$BASE"
 SRCDIR="$BASE/src"
 
 [ -z "$INSTALL" ] && INSTALL="$BASE/build/$ARCH/usr"
 
 export DESTDIR="$INSTALL"
+
+cleanup
+[ -n "$CLEAN" ] && exit 0
 
 CFLAGS="$DBG_FLAGS"
 unset LDFLAGS
