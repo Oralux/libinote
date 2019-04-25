@@ -92,6 +92,7 @@ if [ "$ARCH" = "i686" ]; then
 	LDFLAGS="-m32"
 fi
 export CFLAGS=$CFLAGS
+export LDFLAGS=$LDFLAGS
 for i in src/libinote src/test; do
 	( cd $i; make clean; make all; make install )
 done

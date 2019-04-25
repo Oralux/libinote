@@ -1,15 +1,15 @@
 TARGET = text2tlv tlv2text
 CC = gcc
 CFLAGS += $(DEBUG) -I../api -std=c99
-LDFLAGS = -L $(DESTDIR)/lib
+LDFLAGS += -L $(DESTDIR)/lib
 LDLIBS = -linote
 DESTDIR ?= ../../build/x86_64/usr/
 
 text2tlv:	text2tlv.o
-	$(CC) -o $(@) $(^) -L $(DESTDIR)/lib -linote
+	$(CC) -o $(@) $(^) $(LDFLAGS) -L $(DESTDIR)/lib -linote
 
 tlv2text:	tlv2text.o
-	$(CC) -o $(@) $(^) -L $(DESTDIR)/lib -linote
+	$(CC) -o $(@) $(^) $(LDFLAGS) -L $(DESTDIR)/lib -linote
 
 all: $(TARGET)
 
