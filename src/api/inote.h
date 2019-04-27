@@ -174,5 +174,10 @@ void inote_delete(void *handle);
 */
   inote_error inote_convert_tlv_to_text(inote_slice_t *tlv_message, inote_cb_t *cb);
 
+// convert an inote_error to string
+const char *inote_error_get_string(inote_error err);
+
+// debug
+void inoteDebugInit();
 
 #endif

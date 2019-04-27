@@ -12,41 +12,46 @@ if [ ! -e "$file_utf_8" ]; then
 	iconv -f iso-8859-1 -t utf-8 -o "$file_utf_8" "$testFileDest"  
 fi
 
+T125="ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+T126="éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
 T127="ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
 T256=${T127}${T127}éé
 
 unset testArray
 i=0
 
-testLabel[$i]="utf-8 text"
-testArray[$((i++))]="Un éléphant"
+# testLabel[$i]="utf-8 text"
+# testArray[$((i++))]="Un éléphant"
 
-testLabel[$i]="utf-8 text + filtered annotation + tag + punctuation"
-testArray[$((i++))]="\`gfa1 \`gfa2 \`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"
+# testLabel[$i]="utf-8 text + filtered annotation + tag + punctuation"
+# testArray[$((i++))]="\`gfa1 \`gfa2 \`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"
 
-testLabel[$i]="utf-8 text + annotation"
-testArray[$((i++))]="\`v1 Un \`v2 éléphant"
+# testLabel[$i]="utf-8 text + annotation"
+# testArray[$((i++))]="\`v1 Un \`v2 éléphant"
 
-testLabel[$i]="1 tlv for 127 é (header=2 bytes + value=254 bytes)"
-testArray[$((i++))]=${T127}
+# testLabel[$i]="1 tlv for 127 é (header=2 bytes + value=254 bytes)"
+# testArray[$((i++))]=${T127}
 
-testLabel[$i]="2 tlv: 127 é + a"
-testArray[$((i++))]=${T127}a
+# testLabel[$i]="2 tlv: 127 é + a"
+# testArray[$((i++))]=${T127}a
 
-testLabel[$i]="2 tlv, last utf-8 potentially splitted: a + 127 é"
-testArray[$((i++))]=a${T127}
+# testLabel[$i]="1 tlv: a + 125 é"
+# testArray[$((i++))]=a${T125}
+
+# testLabel[$i]="2 tlv, last utf-8 splitted: a + 125 é + 4 bytes utf8 char 𪚥"
+# testArray[$((i++))]=a${T125}𪚥
 
 testLabel[$i]="1025 bytes: a + 512 é"
 testArray[$((i++))]=$(echo -n "a$T256$T256")
 
-testLabel[$i]="6 bytes: é + 2 erroneous utf-8 bytes + é"
-testArray[$((i++))]=$(echo -en "é\xca\xfeé")
+# testLabel[$i]="6 bytes: é + 2 erroneous utf-8 bytes + é"
+# testArray[$((i++))]=$(echo -en "é\xca\xfeé")
 
-testLabel[$i]="256 bytes: 127 é + 2 erroneous bytes"
-testArray[$((i++))]=$(echo -en "${T127}\xca\xfe")
+# testLabel[$i]="256 bytes: 127 é + 2 erroneous bytes"
+# testArray[$((i++))]=$(echo -en "${T127}\xca\xfe")
 
-testLabel[$i]="257 bytes: a + 127 é + 2 erroneous bytes"
-testArray[$((i++))]=$(echo -en "a${T127}\xca\xfe")
+# testLabel[$i]="257 bytes: a + 127 é + 2 erroneous bytes"
+# testArray[$((i++))]=$(echo -en "a${T127}\xca\xfe")
 
 convertText() {
 	NUM=$1
@@ -69,10 +74,11 @@ convertFile() {
 	echo "text:"
 	cat "$FILE"
 	echo
-	echo "tlv:"
 	./text2tlv -p $PUNCT_MODE -i "$FILE" -o "$FILE.tlv"
-	./tlv2text -i "$FILE.tlv" -o "$FILE.txt"
+	echo "tlv:"
 	hexdump -Cv "$FILE.tlv"
+	./tlv2text -i "$FILE.tlv" -o "$FILE.txt"
+	echo "text:"
 	hexdump -Cv "$FILE.txt"
 }
 
@@ -95,8 +101,8 @@ PUNCT_MODE=1
 TMPFILE=$(mktemp)
 
 if [ "$1" = "-g" ]; then
-	FILE="${testArray[-1]}"
-	gdb -ex "set args -p $PUNCT_MODE -i '$FILE' -o '$FILE.tlv'" -x gdb_commands ./inote
+	echo -en "${testArray[-1]}" > $TMPFILE
+	gdb -ex "set args -p $PUNCT_MODE -i '$TMPFILE' -o '$TMPFILE.tlv'" -x gdb_commands ./text2tlv
 else
 	j=0
 	for i in "${testArray[@]}"; do

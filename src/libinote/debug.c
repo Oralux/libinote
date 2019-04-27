@@ -12,33 +12,33 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-FILE *myDebugFile = NULL;
-static enum DebugLevel myDebugLevel = LV_ERROR_LEVEL;
+FILE *inoteDebugFile = NULL;
+static enum DebugLevel inoteDebugLevel = LV_ERROR_LEVEL;
 
-int DebugEnabled(enum DebugLevel level)
+int inoteDebugEnabled(enum DebugLevel level)
 {
-  if (!myDebugFile)
-    DebugFileInit();
+  if (!inoteDebugFile)
+    inoteDebugFileInit();
 
-  return (myDebugFile && (level <= myDebugLevel)); 
+  return (inoteDebugFile && (level <= inoteDebugLevel)); 
 }
 
 
-void DebugDisplayTime()
+void inoteDebugDisplayTime()
 {
   struct timeval tv;
-  if (!myDebugFile)
-    DebugFileInit();
+  if (!inoteDebugFile)
+    inoteDebugFileInit();
 
-  if (!myDebugFile)
+  if (!inoteDebugFile)
     return;
   
   gettimeofday(&tv, NULL);
-  fprintf(myDebugFile, "%03ld.%06ld ", tv.tv_sec%1000, tv.tv_usec);
+  fprintf(inoteDebugFile, "%03ld.%06ld ", tv.tv_sec%1000, tv.tv_usec);
 }
 
 
-void DebugDump(const char *label, uint8_t *buf, size_t size)
+void inoteDebugDump(const char *label, uint8_t *buf, size_t size)
 {
 #define MAX_BUF_SIZE 1024 
   size_t i;
@@ -50,30 +50,30 @@ void DebugDump(const char *label, uint8_t *buf, size_t size)
   if (size > MAX_BUF_SIZE)
     size = MAX_BUF_SIZE;
 
-  if (!myDebugFile)
-    DebugFileInit();
+  if (!inoteDebugFile)
+    inoteDebugFileInit();
   
-  if (!myDebugFile)
+  if (!inoteDebugFile)
     return;
   
   memset(line ,0, sizeof(line));
-  fprintf(myDebugFile, "%s", label);
+  fprintf(inoteDebugFile, "%s", label);
 
   for (i=0; i<size; i++) {
     if (!(i%16)) {
-      fprintf(myDebugFile, "  %s", line);
+      fprintf(inoteDebugFile, "  %s", line);
       memset(line, 0, sizeof(line));
-      fprintf(myDebugFile, "\n%p  ", buf+i);
+      fprintf(inoteDebugFile, "\n%p  ", buf+i);
     }
-    fprintf(myDebugFile, "%02x ", buf[i]);
+    fprintf(inoteDebugFile, "%02x ", buf[i]);
     line[i%16] = isprint(buf[i]) ? buf[i] : '.';
   }
 
-  fprintf(myDebugFile, "\n");
+  fprintf(inoteDebugFile, "\n");
 }
 
 
-void DebugFileInit()
+void inoteDebugFileInit()
 {
   FILE *fd;
   char c;
@@ -82,10 +82,10 @@ void DebugFileInit()
   mode_t old_mask;
   struct stat buf;
   
-  if (myDebugFile)
-    fclose(myDebugFile);
+  if (inoteDebugFile)
+    fclose(inoteDebugFile);
 
-  myDebugFile = NULL;
+  inoteDebugFile = NULL;
 
   fd = fopen(ENABLE_LOG,"r");
   if (!fd)
@@ -97,25 +97,25 @@ void DebugFileInit()
   /* the debug file must be read by the user only */
   unlink(filename);
   old_mask = umask(0077);
-  myDebugFile = fopen(filename, "w");
+  inoteDebugFile = fopen(filename, "w");
   umask(old_mask);
-  if (!myDebugFile)
+  if (!inoteDebugFile)
     goto exit0;
 
-  if (fstat(fileno(myDebugFile), &buf) || buf.st_mode & 0077) {
+  if (fstat(fileno(inoteDebugFile), &buf) || buf.st_mode & 0077) {
 	err("mode=%o", buf.st_mode);
-	fclose(myDebugFile);
-	myDebugFile = NULL;
+	fclose(inoteDebugFile);
+	inoteDebugFile = NULL;
     goto exit0;
   }
   
-  setbuf(myDebugFile, NULL);
+  setbuf(inoteDebugFile, NULL);
 
-  myDebugLevel = LV_DEBUG_LEVEL;
+  inoteDebugLevel = LV_DEBUG_LEVEL;
   if (fread(&c, 1, 1, fd)) {
     uint32_t i = atoi(&c);
     if (i <= LV_DEBUG_LEVEL)
-      myDebugLevel = i;
+      inoteDebugLevel = i;
   }
   
  exit0:
@@ -123,11 +123,11 @@ void DebugFileInit()
 }
 
 
-void DebugFileFinish()
+void inoteDebugFileFinish()
 {
-  if (myDebugFile)
-    fclose(myDebugFile);  
+  if (inoteDebugFile)
+    fclose(inoteDebugFile);  
 
-  myDebugFile = NULL;
+  inoteDebugFile = NULL;
 }
 

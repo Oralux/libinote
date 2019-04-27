@@ -19,14 +19,13 @@ Options:
 -m, --mach <arch>  target architecture
 		   		   possible value: i686; by default: current arch
 -i, --install      install dir
--t, --test         run tests 
 
 Example:
 # compile libinote
  $0
 
-# compile libinote and tests with debug symbols
- $0 -dt
+# compile libinote with debug symbols
+ $0 -d
 
 " 
 
@@ -47,9 +46,9 @@ cleanup() {
 	(cd src/test && make clean)
 }
 
-unset CC CFLAGS CLEAN DBG_FLAGS HELP INSTALL ARCH STRIP TEST
+unset CC CFLAGS CLEAN DBG_FLAGS HELP INSTALL ARCH STRIP
 
-OPTIONS=`getopt -o cdhi:m:t --long clean,debug,help,install:,mach:,test \
+OPTIONS=`getopt -o cdhi:m: --long clean,debug,help,install:,mach: \
              -n "$NAME" -- "$@"`
 [ $? != 0 ] && usage && exit 1
 eval set -- "$OPTIONS"
@@ -61,7 +60,6 @@ while true; do
     -h|--help) HELP=1; shift;;
     -i|--install) INSTALL=$2; shift 2;;
     -m|--mach) ARCH=$2; shift 2;;
-    -t|--test) TEST=1; shift;;
     --) shift; break;;
     *) break;;
   esac
