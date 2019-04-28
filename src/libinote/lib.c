@@ -86,7 +86,7 @@ static const char *error_get_string[] = {
 #define DBG_PRINT_SLICE(slice) if (slice) { \
 	dbg("slice(buffer=%p, length=%lu, charset=%d, end_of_buffer=%p)",	\
 		(slice)->buffer,												\
-		(slice)->length,												\
+		(long unsigned int)((slice)->length),							\
 		(slice)->charset,												\
 		(slice)->end_of_buffer);										\
   }
@@ -775,7 +775,7 @@ inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, i
   
  exit0:
   DBG_PRINT_SLICE(tlv_message);
-  dbg("LEAVE(%s), *text_left=%lu", inote_error_get_string(ret), text_left ? *text_left : 0);  
+  dbg("LEAVE(%s), *text_left=%lu", inote_error_get_string(ret), text_left ? (long unsigned int)(*text_left) : 0);  
   return ret;
 }
 
