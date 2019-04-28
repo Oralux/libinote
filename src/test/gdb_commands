@@ -1,46 +1,24 @@
-b inote_push_annotation
-commands
+show args
+set pagination off
+define print_segment
+echo segment:\n
 p *segment
-eval "x/%dbc segment->s.buffer",segment->s.length
-p *tlv->s
-eval "x/%dbx tlv->s->buffer",tlv->s->length
-c
+eval "x/%dbx segment->s.buffer",segment->s.end_of_buffer-segment->s.buffer
 end
-b inote_push_entity
-commands
-p *segment
-eval "x/%dbc segment->s.buffer",segment->s.length
+define print_tlv
+echo tlv:\n
 p *tlv->s
-eval "x/%dbx tlv->s->buffer",tlv->s->length
-c
-end
-b inote_push_punct
-commands
-p *segment
-eval "x/%dbc segment->s.buffer",segment->s.length
-p *tlv->s
-eval "x/%dbx tlv->s->buffer",tlv->s->length
-c
-end
-b inote_push_tag
-commands
-p *segment
-eval "x/%dbc segment->s.buffer",segment->s.length
-p *tlv->s
-eval "x/%dbx tlv->s->buffer",tlv->s->length
-c
+eval "x/%dbx tlv->header",tlv->header->length
 end
 b inote_push_text
 commands
-p *segment
-eval "x/%dbc segment->s.buffer",segment->s.length
-p *tlv->s
-eval "x/%dbx tlv->s->buffer",tlv->s->length
+print_segment
 c
 end
-b DebugDump
+b inote_push_text:exit0
 commands
-eval "x/%dbc buf",size
+print_segment
+print_tlv
 c
 end
 r

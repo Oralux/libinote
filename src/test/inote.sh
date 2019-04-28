@@ -20,38 +20,38 @@ T256=${T127}${T127}éé
 unset testArray
 i=0
 
-# testLabel[$i]="utf-8 text"
-# testArray[$((i++))]="Un éléphant"
+testLabel[$i]="utf-8 text"
+testArray[$((i++))]="Un éléphant"
 
-# testLabel[$i]="utf-8 text + filtered annotation + tag + punctuation"
-# testArray[$((i++))]="\`gfa1 \`gfa2 \`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"
+testLabel[$i]="utf-8 text + filtered annotation + tag + punctuation"
+testArray[$((i++))]="\`gfa1 \`gfa2 \`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"
 
-# testLabel[$i]="utf-8 text + annotation"
-# testArray[$((i++))]="\`v1 Un \`v2 éléphant"
+testLabel[$i]="utf-8 text + annotation"
+testArray[$((i++))]="\`v1 Un \`v2 éléphant"
 
-# testLabel[$i]="1 tlv for 127 é (header=2 bytes + value=254 bytes)"
-# testArray[$((i++))]=${T127}
+testLabel[$i]="1 tlv for 127 é (header=2 bytes + value=254 bytes)"
+testArray[$((i++))]=${T127}
 
-# testLabel[$i]="2 tlv: 127 é + a"
-# testArray[$((i++))]=${T127}a
+testLabel[$i]="2 tlv: 127 é + a"
+testArray[$((i++))]=${T127}a
 
-# testLabel[$i]="1 tlv: a + 125 é"
-# testArray[$((i++))]=a${T125}
+testLabel[$i]="1 tlv: a + 125 é"
+testArray[$((i++))]=a${T125}
 
-# testLabel[$i]="2 tlv, last utf-8 splitted: a + 125 é + 4 bytes utf8 char 𪚥"
-# testArray[$((i++))]=a${T125}𪚥
+testLabel[$i]="2 tlv, last utf-8 splitted: a + 125 é + 4 bytes utf8 char 𪚥"
+testArray[$((i++))]=a${T125}𪚥
 
 testLabel[$i]="1025 bytes: a + 512 é"
 testArray[$((i++))]=$(echo -n "a$T256$T256")
 
-# testLabel[$i]="6 bytes: é + 2 erroneous utf-8 bytes + é"
-# testArray[$((i++))]=$(echo -en "é\xca\xfeé")
+testLabel[$i]="6 bytes: é + 2 erroneous utf-8 bytes + é"
+testArray[$((i++))]=$(echo -en "é\xca\xfeé")
 
-# testLabel[$i]="256 bytes: 127 é + 2 erroneous bytes"
-# testArray[$((i++))]=$(echo -en "${T127}\xca\xfe")
+testLabel[$i]="256 bytes: 127 é + 2 erroneous bytes"
+testArray[$((i++))]=$(echo -en "${T127}\xca\xfe")
 
-# testLabel[$i]="257 bytes: a + 127 é + 2 erroneous bytes"
-# testArray[$((i++))]=$(echo -en "a${T127}\xca\xfe")
+testLabel[$i]="257 bytes: a + 127 é + 2 erroneous bytes"
+testArray[$((i++))]=$(echo -en "a${T127}\xca\xfe")
 
 convertText() {
 	NUM=$1

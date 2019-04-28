@@ -246,7 +246,7 @@ static tlv_t *tlv_next(tlv_t *self, inote_type_t type) {
     
   if (!self || !self->s || (type == INOTE_TYPE_UNDEFINED)) {
 	next = NULL;	
-	goto end0;
+	goto exit0;
   }
   
   header = self->header;
@@ -256,11 +256,11 @@ static tlv_t *tlv_next(tlv_t *self, inote_type_t type) {
   if (header) {
 	if (header->type == INOTE_TYPE_UNDEFINED) {
 	  header->length = 0;
-	  goto end0;
+	  goto exit0;
 	}
 	if ((type == header->type) && (header->type == INOTE_TYPE_TEXT)
 		&& (header->length < TLV_VALUE_LENGTH_MAX-TLV_VALUE_LENGTH_THRESHOLD)) {
-	  goto end0;
+	  goto exit0;
 	}
   }  
 
@@ -278,7 +278,7 @@ static tlv_t *tlv_next(tlv_t *self, inote_type_t type) {
 	next = NULL;
   }
 
- end0:
+ exit0:
   DBG_PRINT_TLV_HEADER(next);  
   return next;
 }
@@ -291,13 +291,13 @@ static inote_error tlv_add_length(tlv_t *self, uint16_t *length) {
 
   if (!self || !self->header || !self->s || !length) {
 	ret = INOTE_ARGS_ERROR;
-	goto end0;
+	goto exit0;
   }
 	  
   s = self->s;
   if (slice_get_free_size(s) < *length) {
 	ret = INOTE_TLV_MESSAGE_FULL;
-	goto end0;
+	goto exit0;
   }
   
   header = self->header;
@@ -306,13 +306,13 @@ static inote_error tlv_add_length(tlv_t *self, uint16_t *length) {
   len = min_size(*length, TLV_VALUE_LENGTH_MAX - header->length);
   if (!len) {
 	ret = INOTE_TLV_FULL;
-	goto end0;
+	goto exit0;
   }
   *length -= len;
   header->length += len;
   self->s->length += len;
 
- end0:
+ exit0:
   DBG_PRINT_TLV_HEADER(self);    
   dbg("LEAVE(%s) *length=%d",
 	  inote_error_get_string(ret),
@@ -690,32 +690,32 @@ inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, i
   
   if (!handle || ( (self=(inote_t*)handle)->magic != MAGIC)) {
 	ret = INOTE_ARGS_ERROR;
-	goto end0;
+	goto exit0;
   }
   if (!slice_check(text) || !slice_check(tlv_message)) {
 	ret = INOTE_ARGS_ERROR;
-	goto end0;
+	goto exit0;
   }  
 
   if (slice_get_free_size(text) > TEXT_LENGTH_MAX) {
 	ret = INOTE_ARGS_ERROR;
-	goto end0;
+	goto exit0;
   }  
 
   if (slice_get_free_size(tlv_message) > TLV_MESSAGE_LENGTH_MAX) {
 	ret = INOTE_ARGS_ERROR;
-	goto end0;
+	goto exit0;
   }  
 
   if (!state || !text_left) {
 	ret = INOTE_ARGS_ERROR;
-	goto end0;
+	goto exit0;
   }	
   
   if (!text->length) {
 	tlv_message->length = 0;
 	ret = INOTE_OK;
-	goto end0;
+	goto exit0;
   }
 
   DBG_PRINT_SLICE(text);
@@ -729,7 +729,7 @@ inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, i
   if (get_charset("WCHAR_T//TRANSLIT", "UTF8", &self->cd_to_wchar[text->charset])
 	  || get_charset(charset_name[text->charset], "WCHAR_T", &self->cd_from_wchar[text->charset]))  {
 	ret = INOTE_CHARSET_ERROR;
-	goto end0;
+	goto exit0;
   }
   
   *text_left = 0;
@@ -773,7 +773,7 @@ inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, i
   iconv(self->cd_to_wchar[text->charset], NULL, NULL, NULL, NULL);
   //  DebugDump("tlv: ", tlv_message->buffer, min_size(tlv_message->length, 256));
   
- end0:
+ exit0:
   DBG_PRINT_SLICE(tlv_message);
   dbg("LEAVE(%s), *text_left=%lu", inote_error_get_string(ret), text_left ? *text_left : 0);  
   return ret;
@@ -787,12 +787,12 @@ inote_error inote_convert_tlv_to_text(inote_slice_t *tlv_message, inote_cb_t *cb
 
   if (!cb_check(cb)) {
 	ret = INOTE_ARGS_ERROR;
-	goto end0;
+	goto exit0;
   }
   
   if (!slice_check(tlv_message)) {
 	ret = INOTE_ARGS_ERROR;
-	goto end0;
+	goto exit0;
   }  
 
   DBG_PRINT_SLICE(tlv_message);
@@ -822,7 +822,7 @@ inote_error inote_convert_tlv_to_text(inote_slice_t *tlv_message, inote_cb_t *cb
 	t += TLV_HEADER_LENGTH_MAX + (uint8_t)tlv->length;
   }
 
- end0:
+ exit0:
   dbg("LEAVE(%s)", inote_error_get_string(ret));  
   return ret;
 }

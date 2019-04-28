@@ -138,7 +138,7 @@ int main(int argc, char **argv)
 		text.length -= text_left;
 		text.buffer[text.length] = '?';
 		text.length++;
-		fseek(fdi, -text_left+1, SEEK_CUR);
+		fseek(fdi, -text_left+1, SEEK_CUR); // +1 for '?'
 		ret2 = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
 		loop = (!ret2);
 	  }
@@ -146,7 +146,7 @@ int main(int argc, char **argv)
 	  case INOTE_INCOMPLETE_MULTIBYTE: {
 		int ret2;
 		text.length -= text_left;
-		fseek(fdi, -text_left+1, SEEK_CUR);
+		fseek(fdi, -text_left, SEEK_CUR);
 		ret2 = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
 		loop = (!ret2);
 	  }
