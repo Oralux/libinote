@@ -53,7 +53,10 @@ typedef struct {
   iconv_t cd_from_wchar[MAX_CHARSET];
   wchar_t punctuation_list[MAX_PUNCT];
   wchar_t token[MAX_TOK];
-  uint32_t count;
+  // removing_leading_space: true if leading space must still be removed
+  // (legacy fix at init for vv in text mode and spaces from the
+  // initial and filtered 'gfax)
+  bool removing_leading_space; 
 } inote_t;
 
 typedef struct {
@@ -346,6 +349,40 @@ static inote_error get_charset(const char *tocode, const char *fromcode, iconv_t
   return ret;
 }
 
+static inote_error inote_remove_leading_space(inote_t *self, inote_type_t first, segment_t *segment) {
+  ENTER();
+  inote_error ret = INOTE_OK;  
+  wchar_t *t, *t0, *tmax;
+
+  t = t0 = segment_get_buffer(segment);
+  tmax = segment_get_max(segment);
+  if (!self || !segment) {
+	return INOTE_ARGS_ERROR;
+  }
+
+  if (first == INOTE_TYPE_TEXT) {
+	while ((t < tmax) && (*t == L' ')) {
+	  t++;
+	}
+	if (t == tmax)
+	  goto exit0;
+
+	if (!iswpunct(*t)) {
+	  self->removing_leading_space = false;
+	}
+  } else {
+	self->removing_leading_space = false;
+  }	  
+
+  if (!self->removing_leading_space) {
+	dbg("removing_leading_space = false");			
+  }
+
+ exit0:
+  segment_erase(segment, (uint8_t*)t);
+  return ret;
+}
+  
 static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
   ENTER();
   char *outbuf;
@@ -359,6 +396,17 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
 	ret = INOTE_ARGS_ERROR;
 	goto exit0;
   }
+  
+  if (self->removing_leading_space) {
+	ret = inote_remove_leading_space(self, first, segment);	
+	goto exit0;
+  }
+
+  t = t0 = segment_get_buffer(segment);
+  tmax = segment_get_max(segment);
+
+  // the first char is considered as text
+  t++;
 
   tlv = tlv_next(tlv, first);
   if (!tlv) {
@@ -366,15 +414,14 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
 	goto exit0;
   }
 
-  t = t0 = segment_get_buffer(segment);
-  tmax = segment_get_max(segment);
-  // the first char is considered as text
-  t++;
   if (first == INOTE_TYPE_ANNOTATION) {
-	while ((t < tmax) && (*t != L' ')) {
+	while (t < tmax) {
+	  if (*t == L' ') {
+		t++; // include trailing white space
+		break;
+	  }
 	  t++;
 	}
-	t++; // + white space
   } else {
 	while ((t < tmax) && !iswpunct(*t)) {
 	  t++;
@@ -646,6 +693,8 @@ void *inote_create() {
   if (self) {
 	int i;
 	self->magic = MAGIC;
+	self->removing_leading_space = true;
+	dbg("removing_leading_space = true");	
 	for (i=0; i<MAX_CHARSET; i++) {
 	  self->cd_to_wchar[i] = ICONV_ERROR;
 	  self->cd_from_wchar[i] = ICONV_ERROR;

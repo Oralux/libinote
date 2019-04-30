@@ -20,14 +20,18 @@ T256=${T127}${T127}éé
 unset testArray
 i=0
 
+
 testLabel[$i]="utf-8 text"
-testArray[$((i++))]="Un éléphant"
+testArray[$((i++))]="   Un éléphant"
+
+testLabel[$i]="utf-8 text"
+testArray[$((i++))]=",   Un éléphant"
 
 testLabel[$i]="utf-8 text + filtered annotation + tag + punctuation"
-testArray[$((i++))]="\`gfa1 \`gfa2 \`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"
+testArray[$((i++))]="  \`gfa1 \`gfa2 \`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"
 
 testLabel[$i]="utf-8 text + annotation"
-testArray[$((i++))]="\`v1 Un \`v2 éléphant"
+testArray[$((i++))]=" \`v1 Un \`v2 éléphant"
 
 testLabel[$i]="1 tlv for 127 é (header=2 bytes + value=254 bytes)"
 testArray[$((i++))]=${T127}
@@ -79,7 +83,7 @@ convertFile() {
 	hexdump -Cv "$FILE.tlv"
 	./tlv2text -i "$FILE.tlv" -o "$FILE.txt"
 	echo "text:"
-	hexdump -Cv "$FILE.txt"
+	cat "$FILE.txt"
 }
 
 #PUNCT_MODE=0
@@ -115,3 +119,4 @@ fi
 
 # cat /tmp/libinote.log.*
 
+echo
