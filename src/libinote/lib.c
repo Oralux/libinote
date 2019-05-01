@@ -367,7 +367,7 @@ static inote_error inote_remove_leading_space(inote_t *self, inote_type_t first,
 	if (t == tmax)
 	  goto exit0;
 
-	if (!iswpunct(*t)) {
+	if (!iswpunct(*t) || (t0 == t)) {
 	  self->removing_leading_space = false;
 	}
   } else {
