@@ -24,17 +24,39 @@ void usage() {
   printf("\
 Usage: text2tlv [-p <punct_mode>] [-i inputfile | -t <text>] [-o outputfile]\n\
 Convert a text to a type-length-value byte buffer\n\
-  -i inputfile    read text from file\n\
-  -o outputfile   write tlv to this file\n\
-  -p punct_mode   optional punctuation mode; value from 0 to 2 (see inote_punct_mode_t in inote.h)\n\
-  -t text         utf-8 text\n\
+  -i inputfile          read text from file\n\
+  -o outputfile         write tlv to this file\n\
+  -p punct_mode         optional punctuation mode; value from 0 to 2 (see inote_punct_mode_t in inote.h)\n\
+  -t text               text to convert to tlv\n\
+  -c charset0:charset1  optional charsets: set0 = text charset, set1 = tlv charset. By Default: UTF-8.\n\
+                        possible choices: ISO-8859-1, GBK, UCS-2, SJIS or UTF-8.\n\
 \n\
 EXAMPLE:\n\
 text2tlv -p 0 -t \"Hello, world\" > tlv\n\
 text2tlv -i file.txt -o file.tlv\n\
+text2tlv -c ISO-8859-1:UTF-8 -i file.txt -o file.tlv\n\
 \n\
 ");
 }
+
+static inote_charset_t getCharset(const char* s) {
+  inote_charset_t ret = INOTE_CHARSET_UNDEFINED;
+
+  if (!strcmp(s, "ISO-8859-1")) {
+	ret = INOTE_CHARSET_ISO_8859_1;
+  } else if (!strcmp(s, "GBK")) {
+	ret = INOTE_CHARSET_GBK;
+  } else if (!strcmp(s, "UCS-2")) {
+	ret = INOTE_CHARSET_UCS_2;
+  } else if (!strcmp(s, "SJIS")) {
+	ret = INOTE_CHARSET_SJIS;
+  } else {
+	ret = INOTE_CHARSET_UTF_8;
+  }
+  
+  return ret;
+}
+
 
 int main(int argc, char **argv)
 {
@@ -50,6 +72,8 @@ int main(int argc, char **argv)
   uint8_t text_buffer[TEXT_LENGTH_MAX+1];
   uint32_t state_expected_lang[MAX_LANG];
   uint8_t tlv_message_buffer[TLV_MESSAGE_LENGTH_MAX];
+  inote_charset_t charset0 = INOTE_CHARSET_UTF_8;
+  inote_charset_t charset1 = INOTE_CHARSET_UTF_8;
   
   memset(&text, 0, sizeof(text));
   memset(&tlv_message, 0, sizeof(tlv_message));
@@ -58,8 +82,19 @@ int main(int argc, char **argv)
   text.buffer = text_buffer;
   *text.buffer = 0;
   
-  while ((opt = getopt(argc, argv, "i:o:p:t:")) != -1) {
+  while ((opt = getopt(argc, argv, "c:i:o:p:t:")) != -1) {
 	switch (opt) {
+	case 'c': {
+	  char *x = strchr(optarg, ':');
+	  if (!x) {
+		usage();
+		exit(1);
+	  }
+	  *x = 0;
+	  charset0 = getCharset(optarg);
+	  charset1 = getCharset(x+1);
+	}
+	  break;
 	case 'i':
 	  if (fdi)
 		fclose(fdi);
@@ -82,7 +117,6 @@ int main(int argc, char **argv)
 	case 't':
 	  strncpy(text.buffer, optarg, TEXT_LENGTH_MAX);
 	  text.length = strlen(text.buffer);
-	  text.charset = INOTE_CHARSET_UTF_8;
 	  text.end_of_buffer = text.buffer + TEXT_LENGTH_MAX;	  
 	  break;
 	default:
@@ -96,6 +130,9 @@ int main(int argc, char **argv)
 	  usage();
 	  exit(1);	
   }
+
+
+  text.charset = charset0;
   
   //  state.punct_mode = INOTE_PUNCT_MODE_NONE;
   state.punct_mode = (inote_punct_mode_t)punct_mode;
@@ -108,7 +145,7 @@ int main(int argc, char **argv)
     
   tlv_message.buffer = tlv_message_buffer;
   tlv_message.end_of_buffer = tlv_message.buffer + TLV_MESSAGE_LENGTH_MAX;
-  tlv_message.charset = INOTE_CHARSET_UTF_8;
+  tlv_message.charset = charset1;
 
   void *handle = inote_create();
   if (!fdi) {
@@ -129,7 +166,7 @@ int main(int argc, char **argv)
 	  if (!len)
 		break;
 	  text.length = len;
-	  text.charset = INOTE_CHARSET_UTF_8;
+	  text.charset = charset0;
 	  text.end_of_buffer = text.buffer + len;	  
 	  ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
 	  switch (ret) {
@@ -150,6 +187,8 @@ int main(int argc, char **argv)
 		ret2 = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
 		loop = (!ret2);
 	  }
+		break;
+	  case INOTE_OK:
 		break;
 	  default:
 		loop = false;

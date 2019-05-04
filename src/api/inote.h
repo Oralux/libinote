@@ -126,7 +126,10 @@ void inote_delete(void *handle);
 
   text_left: number of bytes not yet consumed in text->buffer 
 
-  RETURN: 0 if no error
+  RETURN: INOTE_OK if no error, otherwise:
+    - INOTE_INVALID_MULTIBYTE: text_left is set; the first byte left is the invalid byte.
+    - INOTE_INCOMPLETE_MULTIBYTE: idem: text_left set; first byte left is the in.
+    - ... 
   
   Example
   input: text="`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"  
@@ -153,7 +156,7 @@ void inote_delete(void *handle);
 
   cb: callback to be called according to the tlv type
 
-  RETURN: 0 if no error
+  RETURN: INOTE_OK if no error
   
   Example
   input:

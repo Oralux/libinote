@@ -4,12 +4,15 @@ touch /tmp/libinote.ok
 rm -f /tmp/libinote.log.*
 
 testFileUrl="http://abu.cnam.fr/cgi-bin/donner_unformated?nddp1"
-testFileDest=nddp1.txt.iso-8859-1
-
-file_utf_8=${testFileDest%.iso-8859-1}.utf-8
-if [ ! -e "$file_utf_8" ]; then
-	wget -O - "$testFileUrl" | sed -e 's/[\r]//g' -e "/^$/d" > "$testFileDest"
-	iconv -f iso-8859-1 -t utf-8 -o "$file_utf_8" "$testFileDest"  
+file1_orig=nddp1.orig.txt
+file8_orig=nddp8${file1_orig#nddp1}
+file1=${file1_orig%.orig.txt}.10k.txt
+file8=${file8_orig%.orig.txt}.10k.txt
+if [ ! -e "$file8" ]; then
+	wget -O - "$testFileUrl" | sed -e 's/[\r]//g' -e "/^$/d" > "$file1_orig"
+	iconv -f iso-8859-1 -t utf-8 -o "$file8_orig" "$file1_orig"  
+	dd if=$file1_orig of=$file1 bs=1024 count=10
+	iconv -f iso-8859-1 -t utf-8 -o "$file8" "$file1"  
 fi
 
 T125="ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
@@ -19,7 +22,6 @@ T256=${T127}${T127}éé
 
 unset testArray
 i=0
-
 
 testLabel[$i]="utf-8 text"
 testArray[$((i++))]="   Un éléphant"
@@ -86,23 +88,31 @@ convertFile() {
 	cat "$FILE.txt"
 }
 
+
 #PUNCT_MODE=0
 PUNCT_MODE=1
 # PUNCT_MODE=2
 
-# if [ "$1" = "-g" ]; then
-# 	text="${testArray[0]}"
-# 	gdb -ex "set args -p $PUNCT_MODE -t '${testArray[-1]}'" -x gdb_commands ./inote
-# else
-#	j=0
-# 	for i in "${testArray[@]}"; do
-#		j=$((j+1))
-#
-# 		convertText $j "${testLabel[$j]}" "$i" $PUNCT_MODE
-# 	done
-# fi
+testCharset() {
+	FILE=$1
+	SEP=$2
+	CHARSETS=$3
+#	gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -c $CHARSETS -i $FILE -o $FILE.$SEP.tlv" ./text2tlv
+	./text2tlv       -p 1 -c $CHARSETS -i "$FILE" -o "$FILE.$SEP.tlv"
+	./tlv2text -i "$FILE.$SEP.tlv" -o "$FILE.$SEP.txt"
+	diff -q $FILE $FILE.$SEP.txt
+	if [ $? != 0 ]; then
+		echo "$CHARSETS: KO"
+		exit 1
+	fi
+	rm "$FILE.$SEP.tlv" "$FILE.$SEP.txt"
+	echo "$CHARSETS: OK"
+}
 
-TMPFILE=$(mktemp)
+testCharset $file1 1-1 ISO-8859-1:ISO-8859-1
+testCharset $file8 8-8 UTF-8:UTF-8
+testCharset $file1 1-8 ISO-8859-1:UTF-8
+testCharset $file8 8-1 UTF-8:ISO-8859-1
 
 if [ "$1" = "-g" ]; then
 	echo -en "${testArray[-1]}" > $TMPFILE

@@ -761,6 +761,8 @@ inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, i
 	goto exit0;
   }	
   
+  *text_left = 0;
+
   if (!text->length) {
 	tlv_message->length = 0;
 	ret = INOTE_OK;
@@ -775,14 +777,12 @@ inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, i
   output.charset = INOTE_CHARSET_WCHAR_T;
   output.end_of_buffer = output.buffer + sizeof(self->wchar_buf);
   
-  if (get_charset("WCHAR_T//TRANSLIT", "UTF8", &self->cd_to_wchar[text->charset])
-	  || get_charset(charset_name[text->charset], "WCHAR_T", &self->cd_from_wchar[text->charset]))  {
+  if (get_charset("WCHAR_T", charset_name[text->charset], &self->cd_to_wchar[text->charset])
+	  || get_charset(charset_name[tlv_message->charset], "WCHAR_T", &self->cd_from_wchar[tlv_message->charset]))  {
 	ret = INOTE_CHARSET_ERROR;
 	goto exit0;
   }
   
-  *text_left = 0;
-
   inbuf = (char *)(text->buffer);
   inbytesleft = text->length;
   outbuf = (char *)(output.buffer);
