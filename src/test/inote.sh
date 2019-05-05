@@ -65,7 +65,7 @@ convertText() {
 	TEXT="$3"
 	PUNCT_MODE="$4"
 	echo "* $NUM. $LABEL"
-	echo -e "text:\n$TEXT"
+	echo -e "input:\n$TEXT"
 	echo -e "tlv:"
 	./text2tlv -p $PUNCT_MODE -t "$TEXT" | hexdump -Cv
 }
@@ -77,14 +77,14 @@ convertFile() {
 	PUNCT_MODE=$4
 	echo
 	echo "* $NUM. $LABEL"
-	echo "text:"
+	echo "input:"
 	cat "$FILE"
 	echo
 	./text2tlv -p $PUNCT_MODE -i "$FILE" -o "$FILE.tlv"
 	echo "tlv:"
 	hexdump -Cv "$FILE.tlv"
 	./tlv2text -i "$FILE.tlv" -o "$FILE.txt"
-	echo "text:"
+	echo "output:"
 	cat "$FILE.txt"
 }
 
@@ -97,10 +97,11 @@ testCharset() {
 	FILE=$1
 	SEP=$2
 	CHARSETS=$3
+	FILE_EXPECTED=$4
 #	gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -c $CHARSETS -i $FILE -o $FILE.$SEP.tlv" ./text2tlv
 	./text2tlv       -p 1 -c $CHARSETS -i "$FILE" -o "$FILE.$SEP.tlv"
 	./tlv2text -i "$FILE.$SEP.tlv" -o "$FILE.$SEP.txt"
-	diff -q $FILE $FILE.$SEP.txt
+	diff -q $FILE_EXPECTED $FILE.$SEP.txt
 	if [ $? != 0 ]; then
 		echo "$CHARSETS: KO"
 		exit 1
@@ -109,14 +110,23 @@ testCharset() {
 	echo "$CHARSETS: OK"
 }
 
-testCharset $file1 1-1 ISO-8859-1:ISO-8859-1
-testCharset $file8 8-8 UTF-8:UTF-8
-testCharset $file1 1-8 ISO-8859-1:UTF-8
-testCharset $file8 8-1 UTF-8:ISO-8859-1
+testCharset $file1 1-1 ISO-8859-1:ISO-8859-1 $file1
+testCharset $file8 8-8 UTF-8:UTF-8 $file8
+testCharset $file1 1-8 ISO-8859-1:UTF-8 $file8
+testCharset $file8 8-1 UTF-8:ISO-8859-1 $file1
+
+# testCharset $file1_orig 1-1 ISO-8859-1:ISO-8859-1 $file1_orig
+# testCharset $file8_orig 8-8 UTF-8:UTF-8 $file8_orig
+# testCharset $file1_orig 1-8 ISO-8859-1:UTF-8 $file8_orig
+# testCharset $file8_orig 8-1 UTF-8:ISO-8859-1 $file1_orig
+
+
+TMPFILE=$(mktemp)
 
 if [ "$1" = "-g" ]; then
 	echo -en "${testArray[-1]}" > $TMPFILE
-	gdb -ex "set args -p $PUNCT_MODE -i '$TMPFILE' -o '$TMPFILE.tlv'" -x gdb_commands ./text2tlv
+	gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -p $PUNCT_MODE -i '$TMPFILE' -o '$TMPFILE.tlv'" -x gdb_commands ./text2tlv
+#	gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -p $PUNCT_MODE -i '$TMPFILE' -o '$TMPFILE.tlv'" ./text2tlv
 else
 	j=0
 	for i in "${testArray[@]}"; do

@@ -12,7 +12,7 @@ typedef enum {
   INOTE_CHARSET_SJIS,
   INOTE_CHARSET_UTF_8,
   INOTE_CHARSET_UTF_16,
-  INOTE_CHARSET_WCHAR_T,
+  INOTE_CHARSET_UTF_32,
 } inote_charset_t;
 
 typedef enum {
@@ -86,7 +86,7 @@ typedef enum {
   INOTE_TLV_MESSAGE_FULL, // no other tlv can be added to tlv_message
   INOTE_TLV_FULL, // the current tlv is full
   INOTE_UNPROCESSED,
-  INOTE_UNEMPTIED_BUFFER, // the internal wchar_t buffer can't be fully processed
+  INOTE_UNEMPTIED_BUFFER, // the internal char32_t buffer can't be fully processed
   INOTE_TLV_ERROR,
   INOTE_IO_ERROR,
   INOTE_ERRNO=0x1000 // return 0x1000 + errno  
