@@ -1,6 +1,6 @@
 #!/bin/bash
 
-touch /tmp/libinote.ok
+touch $HOME/libinote.ok
 rm -f /tmp/libinote.log.*
 
 testFileUrl="http://abu.cnam.fr/cgi-bin/donner_unformated?nddp1"
