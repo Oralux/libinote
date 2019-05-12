@@ -9,7 +9,7 @@
 #include <stdio.h>
 
   /* log enabled if this file exits */
-#define ENABLE_LOG "/tmp/libinote.ok"
+#define ENABLE_LOG "libinote.ok"
 
   /* log level; first byte equals to a digit in DebugLevel (default  */
 #define LIBINOTELOG "/tmp/libinote.log.%d"
@@ -34,7 +34,6 @@
 #define BUILD_ASSERT(condition) ((void)sizeof(char[(condition)?1:-1]))
 
   extern int inoteDebugEnabled(enum DebugLevel level);
-  extern void inoteDebugFileInit();
   extern void inoteDebugFileFinish();
   extern void inoteDebugDisplayTime();
   extern void inoteDebugDump(const char *label, uint8_t *buf, size_t size);

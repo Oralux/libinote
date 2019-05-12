@@ -14,11 +14,13 @@
 
 FILE *inoteDebugFile = NULL;
 static enum DebugLevel inoteDebugLevel = LV_ERROR_LEVEL;
+static int checkEnableCount = 0;
+static void DebugFileInit();
 
 int inoteDebugEnabled(enum DebugLevel level)
 {
   if (!inoteDebugFile)
-    inoteDebugFileInit();
+    DebugFileInit();
 
   return (inoteDebugFile && (level <= inoteDebugLevel)); 
 }
@@ -28,7 +30,7 @@ void inoteDebugDisplayTime()
 {
   struct timeval tv;
   if (!inoteDebugFile)
-    inoteDebugFileInit();
+    DebugFileInit();
 
   if (!inoteDebugFile)
     return;
@@ -51,7 +53,7 @@ void inoteDebugDump(const char *label, uint8_t *buf, size_t size)
     size = MAX_BUF_SIZE;
 
   if (!inoteDebugFile)
-    inoteDebugFileInit();
+    DebugFileInit();
   
   if (!inoteDebugFile)
     return;
@@ -73,23 +75,37 @@ void inoteDebugDump(const char *label, uint8_t *buf, size_t size)
 }
 
 
-void inoteDebugFileInit()
+void DebugFileInit()
 {
-  FILE *fd;
+  FILE *fd = NULL;
   char c;
 #define MAX_FILENAME 40
   char filename[MAX_FILENAME+1];
   mode_t old_mask;
   struct stat buf;
   
-  if (inoteDebugFile)
-    fclose(inoteDebugFile);
+  if (checkEnableCount)
+	return;
 
-  inoteDebugFile = NULL;
-
-  fd = fopen(ENABLE_LOG,"r");
+  checkEnableCount = 1;
+  
+  char *home = getenv("HOME");
+  if (!home)
+	return;
+  
+  if (snprintf(filename, MAX_FILENAME, "%s/%s", home, ENABLE_LOG) >= MAX_FILENAME)
+	return;
+  
+  fd = fopen(filename, "r");
   if (!fd)
     return;
+  
+  inoteDebugLevel = LV_DEBUG_LEVEL;
+  if (fread(&c, 1, 1, fd)) {
+    uint32_t i = atoi(&c);
+    if (i <= LV_DEBUG_LEVEL)
+      inoteDebugLevel = i;
+  }
 
   if (snprintf(filename, MAX_FILENAME, LIBINOTELOG, getpid()) >= MAX_FILENAME)
     goto exit0;
@@ -111,15 +127,9 @@ void inoteDebugFileInit()
   
   setbuf(inoteDebugFile, NULL);
 
-  inoteDebugLevel = LV_DEBUG_LEVEL;
-  if (fread(&c, 1, 1, fd)) {
-    uint32_t i = atoi(&c);
-    if (i <= LV_DEBUG_LEVEL)
-      inoteDebugLevel = i;
-  }
-  
  exit0:
-  fclose(fd);    
+  if (fd)
+	fclose(fd);    
 }
 
 
@@ -129,5 +139,6 @@ void inoteDebugFileFinish()
     fclose(inoteDebugFile);  
 
   inoteDebugFile = NULL;
+  checkEnableCount = 0;
 }
 
