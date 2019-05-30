@@ -173,9 +173,9 @@ int main(int argc, char **argv)
 	  case INOTE_INVALID_MULTIBYTE: {
 		int ret2;
 		text.length -= text_left;
-		text.buffer[text.length] = '?';
+		text.buffer[text.length] = ' '; // ignore this byte
 		text.length++;
-		fseek(fdi, -text_left+1, SEEK_CUR); // +1 for '?'
+		fseek(fdi, -text_left+1, SEEK_CUR); // +1 for the space character
 		ret2 = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
 		loop = (!ret2);
 	  }

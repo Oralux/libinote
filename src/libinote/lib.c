@@ -20,13 +20,13 @@
 
 static const char* charset_name[] = {
   NULL,
-  "ISO-8859-1//TRANSLIT",
-  "GBK//TRANSLIT",
-  "UCS2//TRANSLIT",
-  "BIG5//TRANSLIT",
-  "SJIS//TRANSLIT",
-  "UTF8//TRANSLIT",
-  "UTF16//TRANSLIT",
+  "ISO-8859-1//IGNORE",
+  "GBK//IGNORE",
+  "UCS2//IGNORE",
+  "BIG5//IGNORE",
+  "SJIS//IGNORE",
+  "UTF8//IGNORE",
+  "UTF16//IGNORE",
   "UTF32LE", // UTF32 instead of UTF32LE would add BOM
 };
 #define MAX_CHARSET (sizeof(charset_name)/sizeof(*charset_name))
@@ -447,7 +447,7 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
 	   unexpected error, complete sequences are expected
 	   EILSEQ:
 	   invalid multibyte sequence in the input:
-	   unexpected error thanks to //TRANSLIT
+	   unexpected error thanks to //IGNORE
 	*/
 	dbg("unexpected error: %s", strerror(err));
 	ret = INOTE_ARGS_ERROR;
