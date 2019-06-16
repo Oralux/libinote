@@ -7,7 +7,6 @@
 #include <wctype.h>
 #include <uchar.h>
 #include "inote.h"
-#include "conf.h"
 #include "debug.h"
 
 #define ICONV_ERROR ((iconv_t)-1)

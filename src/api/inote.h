@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#define INOTE_VERSION_MAJOR 1
+#define INOTE_VERSION_MINOR 0
+#define INOTE_VERSION_PATCH 0
+
 typedef enum {
   INOTE_CHARSET_UNDEFINED = 0,
   INOTE_CHARSET_ISO_8859_1,

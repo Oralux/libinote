@@ -34,11 +34,11 @@ Example:
 getVersion() {
 	local value
 	local i
-	for i in VERMAJ VERMIN VERMIC; do
+	for i in INOTE_VERSION_MAJOR INOTE_VERSION_MINOR INOTE_VERSION_PATCH; do
 		value=$(awk "/$i/{print \$3}" $BASE/src/conf.h)
 		eval export $i=$value
 	done
-	export VERSION=$VERMAJ.$VERMIN.$VERMIC
+	export VERSION=$INOTE_VERSION_MAJOR.$INOTE_VERSION_MINOR.$INOTE_VERSION_PATCH
 }
 
 cleanup() {
