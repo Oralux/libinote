@@ -3,6 +3,9 @@
 touch $HOME/libinote.ok
 rm -f /tmp/libinote.log.*
 
+#unset QUIET
+QUIET=1
+
 testFileUrl="http://abu.cnam.fr/cgi-bin/donner_unformated?nddp1"
 file1_orig=nddp1.orig.txt
 file8_orig=nddp8${file1_orig#nddp1}
@@ -20,44 +23,60 @@ T126="ééééééééééééééééééééééééééééééééééééé
 T127="ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
 T256=${T127}${T127}éé
 
-unset testArray
+unset testArray testRes
 i=0
 
 testLabel[$i]="utf-8 text"
 testArray[$((i++))]="   Un éléphant"
+testRes[$((i++))]="Un éléphant"
 
 testLabel[$i]="utf-8 text"
 testArray[$((i++))]=",   Un éléphant"
+testRes[$((i++))]=",   Un éléphant"
 
 testLabel[$i]="utf-8 text + filtered annotation + tag + punctuation"
 testArray[$((i++))]="  \`gfa1 \`gfa2 \`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"
+testRes[$((i++))]="Un <éléphant> (1)"
 
 testLabel[$i]="utf-8 text + annotation"
 testArray[$((i++))]=" \`v1 Un \`v2 éléphant"
+testRes[$((i++))]=""
 
 testLabel[$i]="1 tlv for 127 é (header=2 bytes + value=254 bytes)"
 testArray[$((i++))]=${T127}
+testRes[$((i++))]=""
 
 testLabel[$i]="2 tlv: 127 é + a"
 testArray[$((i++))]=${T127}a
+testRes[$((i++))]=""
 
 testLabel[$i]="1 tlv: a + 125 é"
 testArray[$((i++))]=a${T125}
+testRes[$((i++))]=""
 
 testLabel[$i]="2 tlv, last utf-8 splitted: a + 125 é + 4 bytes utf8 char 𪚥"
 testArray[$((i++))]=a${T125}𪚥
+testRes[$((i++))]=""
 
 testLabel[$i]="1025 bytes: a + 512 é"
 testArray[$((i++))]=$(echo -n "a$T256$T256")
+testRes[$((i++))]=""
 
 testLabel[$i]="6 bytes: é + 2 erroneous utf-8 bytes + é"
 testArray[$((i++))]=$(echo -en "é\xca\xfeé")
+testRes[$((i++))]=""
 
 testLabel[$i]="256 bytes: 127 é + 2 erroneous bytes"
 testArray[$((i++))]=$(echo -en "${T127}\xca\xfe")
+testRes[$((i++))]=""
 
 testLabel[$i]="257 bytes: a + 127 é + 2 erroneous bytes"
 testArray[$((i++))]=$(echo -en "a${T127}\xca\xfe")
+testRes[$((i++))]=""
+
+leave() {
+	echo "$1" && exit $2
+}
 
 convertText() {
 	NUM=$1
@@ -75,17 +94,30 @@ convertFile() {
 	LABEL=$2
 	FILE=$3
 	PUNCT_MODE=$4
-	echo
-	echo "* $NUM. $LABEL"
-	echo "input:"
-	cat "$FILE"
-	echo
+	if [ -z "$QUIET" ]; then	
+		echo
+		echo "* $NUM. $LABEL"
+		echo "input:"
+		cat "$FILE"
+		echo
+	fi
+	
 	./text2tlv -p $PUNCT_MODE -i "$FILE" -o "$FILE.tlv"
-	echo "tlv:"
-	hexdump -Cv "$FILE.tlv"
+
+	if [ -z "$QUIET" ]; then	
+		echo "tlv:"
+		hexdump -Cv "$FILE.tlv"
+	fi
+
 	./tlv2text -i "$FILE.tlv" -o "$FILE.txt"
-	echo "output:"
-	cat "$FILE.txt"
+	if [ -z "$QUIET" ]; then	
+		echo "output:"
+		cat "$FILE.txt"
+	fi
+
+	diff -q "$FILE.tlv" res/$(basename "$FILE.tlv") || leave "text $NUM. $LABEL (tlv): KO" 1
+	diff -q "$FILE.txt" res/$(basename "$FILE.txt") || leave "text $NUM. $LABEL (txt): KO" 1
+	echo "text $NUM: OK"
 }
 
 
@@ -101,14 +133,14 @@ testCharset() {
 #	gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -c $CHARSETS -i $FILE -o $FILE.$SEP.tlv" ./text2tlv
 	./text2tlv       -p 1 -c $CHARSETS -i "$FILE" -o "$FILE.$SEP.tlv"
 	./tlv2text -i "$FILE.$SEP.tlv" -o "$FILE.$SEP.txt"
-	diff -q $FILE_EXPECTED $FILE.$SEP.txt
-	if [ $? != 0 ]; then
-		echo "$CHARSETS: KO"
-		exit 1
-	fi
+	diff -q $FILE_EXPECTED $FILE.$SEP.txt || leave "$CHARSETS: KO" 1
 	rm "$FILE.$SEP.tlv" "$FILE.$SEP.txt"
-	echo "$CHARSETS: OK"
+	echo "charset $CHARSETS: OK"
 }
+
+echo
+echo "libinote: starting tests"
+echo
 
 testCharset $file1 1-1 ISO-8859-1:ISO-8859-1 $file1
 testCharset $file8 8-8 UTF-8:UTF-8 $file8
@@ -121,15 +153,17 @@ testCharset $file8 8-1 UTF-8:ISO-8859-1 $file1
 # testCharset $file8_orig 8-1 UTF-8:ISO-8859-1 $file1_orig
 
 
-TMPFILE=$(mktemp)
+TMPDIR=$(mktemp -d)
 
 if [ "$1" = "-g" ]; then
+	TMPFILE=${TMPDIR}/test_last
 	echo -en "${testArray[-1]}" > $TMPFILE
 	gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -p $PUNCT_MODE -i '$TMPFILE' -o '$TMPFILE.tlv'" -x gdb_commands ./text2tlv
 #	gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -p $PUNCT_MODE -i '$TMPFILE' -o '$TMPFILE.tlv'" ./text2tlv
 else
 	j=0
 	for i in "${testArray[@]}"; do
+		TMPFILE=${TMPDIR}/test_$j
 		echo -en "$i" > $TMPFILE
 #		rm -f "$FILE.tlv" "$FILE.txt" 
 		convertFile $j "${testLabel[$j]}" "$TMPFILE" $PUNCT_MODE
@@ -140,3 +174,6 @@ fi
 # cat /tmp/libinote.log.*
 
 echo
+echo "libinote: PASS"
+echo
+

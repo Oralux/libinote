@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 BASE=$(dirname $(realpath "$0"))
 NAME=$(basename "$0")
@@ -10,7 +10,7 @@ usage() {
 Usage: 
  $NAME [options]
 
-Build the libvoxin binaries (libvoxin, voxind, tests).
+Build libinote and tests.
 
 Options: 
 -c, --clean		   clean-up: delete the build directory and object files
@@ -19,6 +19,7 @@ Options:
 -m, --mach <arch>  target architecture
 		   		   possible value: i686; by default: current arch
 -i, --install      install dir
+-t, --test         run tests
 
 Example:
 # compile libinote
@@ -26,6 +27,9 @@ Example:
 
 # compile libinote with debug symbols
  $0 -d
+
+# compile libinote, run tests
+ $0 -t
 
 " 
 
@@ -46,9 +50,9 @@ cleanup() {
 	(cd src/test && make clean)
 }
 
-unset CC CFLAGS CLEAN DBG_FLAGS HELP INSTALL ARCH STRIP
+unset CC CFLAGS CLEAN DBG_FLAGS HELP INSTALL ARCH STRIP TEST
 
-OPTIONS=`getopt -o cdhi:m: --long clean,debug,help,install:,mach: \
+OPTIONS=`getopt -o cdhi:m:t --long clean,debug,help,install:,mach:,test \
              -n "$NAME" -- "$@"`
 [ $? != 0 ] && usage && exit 1
 eval set -- "$OPTIONS"
@@ -60,6 +64,7 @@ while true; do
     -h|--help) HELP=1; shift;;
     -i|--install) INSTALL=$2; shift 2;;
     -m|--mach) ARCH=$2; shift 2;;
+    -t|--test) TEST=1; shift;;
     --) shift; break;;
     *) break;;
   esac
@@ -95,3 +100,7 @@ for i in src/libinote src/test; do
 	( cd $i; make clean; make all; make install )
 done
 
+if [ -n "$TEST" ]; then
+	cd src/test
+	./inote.sh
+fi

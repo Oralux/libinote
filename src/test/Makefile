@@ -1,6 +1,6 @@
 TARGET = text2tlv tlv2text
 CC = gcc
-CFLAGS += $(DEBUG) -I../api -std=c99
+CFLAGS += $(DEBUG) -I../api -std=c11
 LDFLAGS += -L $(DESTDIR)/lib
 LDLIBS = -linote
 DESTDIR ?= ../../build/x86_64/usr/
@@ -17,4 +17,5 @@ clean:
 	rm -f *o *~ $(TARGET)
 
 install:
-	mkdir -p $(DESTDIR)/bin; install -D -m 755 $(TARGET) $(DESTDIR)/bin
+	echo none
+#mkdir -p $(DESTDIR)/bin; install -D -m 755 $(TARGET) inote.sh $(DESTDIR)/bin
