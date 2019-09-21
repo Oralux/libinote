@@ -156,6 +156,25 @@ int main(int argc, char **argv)
 	  text.length -= text_left;
 	  ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
 	  break;
+	case INOTE_LANGUAGE_SWITCHING: {
+	  char *s = text.buffer + text.length - text_left;
+	  int i;
+	  for (i=0; i<text_left; i++) {
+		if (s[i] == ' ')
+		  break;
+	  }
+	  if (s[i] == ' ') {
+		s[i] = 0;
+		printf("annotation: %s\n", s);
+		i++;
+		if (i < text_left) {
+		  text_left -= i;
+		  text.buffer = s + i;
+		  text.length = text_left;
+		  ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
+		}
+	  }
+	}
 	default:
 	  break;
 	}
@@ -190,6 +209,26 @@ int main(int argc, char **argv)
 		break;
 	  case INOTE_OK:
 		break;
+	  case INOTE_LANGUAGE_SWITCHING: {
+		char *s = text.buffer + text.length - text_left;
+		int i;
+		for (i=0; i<text_left; i++) {
+		  if (s[i] == ' ')
+			break;
+		}
+		if (s[i] == ' ') {
+		  s[i] = 0;
+		  printf("annotation: %s\n", s);
+		  i++;
+		  if (i < text_left) {
+			text_left -= i;
+			text.buffer = s + i;
+			text.length = text_left;
+			fseek(fdi, -text_left, SEEK_CUR);			
+			ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
+		}
+	  }
+	}
 	  default:
 		loop = false;
 		break;
