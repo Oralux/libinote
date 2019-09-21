@@ -74,6 +74,11 @@ testLabel[$i]="257 bytes: a + 127 é + 2 erroneous bytes"
 testArray[$((i++))]=$(echo -en "a${T127}\xca\xfe")
 testRes[$((i++))]=""
 
+testLabel[$i]="utf-8 text + language switching annotation"
+testArray[$((i++))]="Un éléphant \`l0x12345678 One elephant"
+testRes[$((i++))]="Un éléphant"
+
+
 leave() {
 	echo "$1" && exit $2
 }

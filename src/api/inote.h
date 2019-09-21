@@ -5,7 +5,7 @@
 
 #define INOTE_VERSION_MAJOR 1
 #define INOTE_VERSION_MINOR 0
-#define INOTE_VERSION_PATCH 1
+#define INOTE_VERSION_PATCH 2
 
 typedef enum {
   INOTE_CHARSET_UNDEFINED = 0,
@@ -52,6 +52,7 @@ length = 1 + remaining text (first char=punctuation char, followed by text)
 Annotation
 type = INOTE_TYPE_ANNOTATION
 length = annotation length
+
 */
 typedef struct {
   uint8_t type;
@@ -93,6 +94,7 @@ typedef enum {
   INOTE_UNEMPTIED_BUFFER, // the internal char32_t buffer can't be fully processed
   INOTE_TLV_ERROR,
   INOTE_IO_ERROR,
+  INOTE_LANGUAGE_SWITCHING, // the remaining input text concerns another language (see below 'Language Switching')
   INOTE_ERRNO=0x1000 // return 0x1000 + errno  
 } inote_error;
 
@@ -130,9 +132,15 @@ void inote_delete(void *handle);
 
   text_left: number of bytes not yet consumed in text->buffer 
 
+  Language switching
+  If an annotation requires to change the language,
+  inote_convert_text_to_tlv returns INOTE_LANGUAGE_SWITCHING, and the
+  remaining text points on this annotation.
+
   RETURN: INOTE_OK if no error, otherwise:
     - INOTE_INVALID_MULTIBYTE: text_left is set; the first byte left is the invalid byte.
-    - INOTE_INCOMPLETE_MULTIBYTE: idem: text_left set; first byte left is the in.
+    - INOTE_INCOMPLETE_MULTIBYTE: idem: text_left set; first byte left is the invalid byte.
+	- INOTE_LANGUAGE_SWITCHING: text_left is set; the first byte left is the annotation.
     - ... 
   
   Example

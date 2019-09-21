@@ -1,6 +1,9 @@
+// for memmem
+#define _GNU_SOURCE
+#include <string.h>
+//
 #include <stdlib.h>
 #include <stdbool.h>
-#include <string.h>
 #include <stdint.h>
 #include <iconv.h>
 #include <errno.h>
@@ -82,6 +85,7 @@ static const char *error_get_string[] = {
   "INOTE_UNEMPTIED_BUFFER",
   "INOTE_TLV_ERROR",
   "INOTE_IO_ERROR",
+  "INOTE_LANGUAGE_SWITCHING",
   "INOTE_ERRNO" // INOTE_ERRNO: must be last enum
 };
 
@@ -552,6 +556,7 @@ static inote_error inote_push_annotation(inote_t *self, segment_t *segment, inot
 
   char32_t gfa[] = U"`gfa";
   char32_t pf[] = U"`Pf";
+  char32_t lang[] = U"`l";
   if (!memcmp(t0, gfa, sizeof(gfa) - 4)) {
 	switch(t0[4]) {
 	case U'1':
@@ -585,6 +590,12 @@ static inote_error inote_push_annotation(inote_t *self, segment_t *segment, inot
 	goto exit0;
   }
   
+  if (!memcmp(t0, lang, sizeof(lang) - 4)) {
+	dbg("language switching");
+	ret = INOTE_LANGUAGE_SWITCHING;
+	goto exit1;
+  }
+
   first = INOTE_TYPE_ANNOTATION;
   ret = INOTE_UNPROCESSED;
 
@@ -594,6 +605,7 @@ static inote_error inote_push_annotation(inote_t *self, segment_t *segment, inot
   } else {
 	segment_erase(segment, (uint8_t*)(t+1));
   }
+ exit1:
   return ret;
 }
 
@@ -669,7 +681,9 @@ static inote_error inote_get_type_length_value(inote_t *self, const inote_slice_
 	  default:
 		break;
 	  }
-	  if (ret) {
+	  if (ret == INOTE_LANGUAGE_SWITCHING)
+		break;
+	  else if (ret) {
 		ret = inote_push_punct(self, &segment, state, &tlv);
 	  }
 	}
@@ -799,6 +813,14 @@ inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, i
 	*text_left = inbytesleft;
 	output.length = outbytesleftmax - outbytesleft;
 	ret = inote_get_type_length_value(self, &output, state, tlv_message);
+	
+	if (ret == INOTE_LANGUAGE_SWITCHING) {
+	  char *s = (char *)memmem(text->buffer, text->length, "`l", 2); // TODO convert the annotation in the corresponding charset
+	  const char *tmax = text->buffer + text->length;
+	  if (s && (s < tmax)) {
+		*text_left = tmax - s;
+	  }
+	}
   } else {
 	int err = errno;
 	uint8_t *byte_error = (uint8_t *)inbuf;
