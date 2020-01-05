@@ -138,7 +138,8 @@ testCharset() {
 	SEP=$2
 	CHARSETS=$3
 	FILE_EXPECTED=$4
-#	gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -c $CHARSETS -i $FILE -o $FILE.$SEP.tlv" ./text2tlv
+	# uncomment gdb if needed
+	# gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -c $CHARSETS -i $FILE -o $FILE.$SEP.tlv" ./text2tlv
 	./text2tlv       -p 1 -c $CHARSETS -i "$FILE" -o "$FILE.$SEP.tlv"
 	./tlv2text -i "$FILE.$SEP.tlv" -o "$FILE.$SEP.txt"
 	diff -q $FILE_EXPECTED $FILE.$SEP.txt || leave "$CHARSETS: KO" 1
@@ -153,6 +154,11 @@ echo
 TMPDIR=$(mktemp -d)
 filea8=${TMPDIR}/test_utf8_symbol
 filea1=${TMPDIR}/test_latin1
+
+echo "Produits • La Boutique" > $filea8
+echo "Produits  La Boutique" > $filea1
+testCharset $filea8 8-1 UTF-8:ISO-8859-1 $filea1
+
 # quote=0xe2 0x80 0x99
 echo "l’ail" > $filea8
 # quote=0x27

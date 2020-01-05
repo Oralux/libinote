@@ -504,6 +504,10 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
 	   is filtered out (iconv + //IGNORE)
 	*/
 	if (!convert_quote_to_ascii((wchar_t*)inbuf0, inbytes0)) {
+	  // no replaced character: return the filtered buffer
+	  uint16_t length = max_outbytesleft - outbytesleft;
+	  err = 0;
+	  ret = tlv_add_length(tlv, &length);
 	  goto exit0;
 	}
 
