@@ -385,18 +385,60 @@ static inote_error inote_remove_leading_space(inote_t *self, inote_type_t first,
   segment_erase(segment, (uint8_t*)t);
   return ret;
 }
-  
+
+
+/* 
+   convert any wide character equivalent to a quote to the ascii quote
+   character
+   
+   return 0 if no character has been converted
+ */
+static int convert_quote_to_ascii(wchar_t *buffer, size_t size) {
+	wchar_t *s = buffer;
+	int i;
+	char c = 0;
+
+	for (i=0; i<size/sizeof(wchar_t); i++) {
+	  if (s[i]&0x0000ff00) {
+		if ((s[i]&0x0000ff00) == 0x2000) {
+		  if (((s[i] >= 0x2018) && (s[i] <= 0x201f))
+			  || (s[i] == 0x2039) || (s[i] == 0x203a)) {
+			c=s[i]='\'';
+		  }
+		} else if ((s[i]&0x0000ff00) == 0x2700) {
+		  if (((s[i] >= 0x275b) && (s[i] <= 0x275e))
+			  || (s[i] == 0x276e) || (s[i] == 0x276f)) {
+			c=s[i]='\'';
+		  }
+		} else if ((s[i]&0x0000ff00) == 0xa400) {
+		  if ((s[i] >= 0xa404) && (s[i] <= 0xa407)) {
+			c=s[i]='\'';
+		  }
+		} else if ((s[i] == 0x13c9) || (s[i] == 0x13c9)
+				   || (s[i] == 0x2358) || (s[i] == 0x2359)
+				   || (s[i] >= 0x301d) || (s[i] <= 0x301f)
+				   || (s[i] == 0xff02)) {
+		  c=s[i]='\'';
+		}
+	  } else if ((s[i] == 0xe0022) || (s[i] == 0xab) || (s[i] == 0xbb)) {
+		c=s[i]='\'';
+	  }
+	}
+	return c;
+}
+
 static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
   ENTER();
-  char *outbuf;
-  size_t outbytesleft, max_outbytesleft = 0;
-  inote_error ret = INOTE_OK;  
+  char *outbuf0, *outbuf;
+  size_t outbytesleft, outbytesleft0, max_outbytesleft = 0;
+  char *inbuf0;
+  size_t inbytes0;  
+  inote_error ret = INOTE_ARGS_ERROR;
   int status;
   int err = 0;
   char32_t *t, *t0, *tmax;
 
   if (!self || !segment || !tlv) {
-	ret = INOTE_ARGS_ERROR;
 	goto exit0;
   }
   
@@ -431,10 +473,11 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
 	}
   }
 
-  segment->s.length = (uint8_t*)t - (uint8_t*)t0;
-  outbuf = (char*)tlv_get_free_byte(tlv);
-  max_outbytesleft = outbytesleft = tlv_get_free_size(tlv);
-  
+  segment->s.length = inbytes0 = (uint8_t*)t - (uint8_t*)t0;
+  outbuf = outbuf0 = (char*)tlv_get_free_byte(tlv);
+  max_outbytesleft = outbytesleft = outbytesleft0 = tlv_get_free_size(tlv);
+  inbuf0 = (char*)segment->s.buffer;
+
   dbg("iconv");
   status = iconv(self->cd_from_char32[tlv->s->charset],
 				 (char**)&segment->s.buffer, &segment->s.length,
@@ -443,21 +486,49 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
   if (!status || (err == E2BIG)) {
 	uint16_t length = max_outbytesleft - outbytesleft;
 	ret = tlv_add_length(tlv, &length);
-  } else {
+  } else if (err != EILSEQ) {
 	/* 
 	   EINVAL: 
 	   incomplete multibyte sequence in the input:
 	   unexpected error, complete sequences are expected
+	*/
+	goto exit0;
+  } else {
+	/* 
 	   EILSEQ:
 	   invalid multibyte sequence in the input:
-	   unexpected error thanks to //IGNORE
+	   can be returned (even with //IGNORE) if a wide character has no
+	   equivalent in the destination charset (e.g. latin1).
+
+	   The wide character is replaced if possible by an ascii quote or
+	   is filtered out (iconv + //IGNORE)
 	*/
-	dbg("unexpected error: %s", strerror(err));
-	ret = INOTE_ARGS_ERROR;
+	if (!convert_quote_to_ascii((wchar_t*)inbuf0, inbytes0)) {
+	  goto exit0;
+	}
+
+	// replay iconv using the new buffer
+	segment->s.buffer = inbuf0;
+	segment->s.length = inbytes0;
+	outbuf = outbuf0;
+	outbytesleft = outbytesleft0;
+	status = iconv(self->cd_from_char32[tlv->s->charset],
+				   (char**)&segment->s.buffer, &segment->s.length,
+				   &outbuf, &outbytesleft);
+	if (!status || (err == E2BIG) || (err == EILSEQ)) {
+	  // return the whole buffer even in case of filtered characters
+	  uint16_t length = max_outbytesleft - outbytesleft;
+	  ret = tlv_add_length(tlv, &length);
+	} else {
+	  goto exit0;
+	}
   }
   iconv(self->cd_from_char32[tlv->s->charset], NULL, NULL, NULL, NULL);
 
  exit0:
+  if (err) {
+	dbg("unexpected error: %s", strerror(err));
+  }
   dbg("LEAVE(%s)", inote_error_get_string(ret));  
   return ret;
 }

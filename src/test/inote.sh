@@ -18,6 +18,9 @@ if [ ! -e "$file8" ]; then
 	iconv -f iso-8859-1 -t utf-8 -o "$file8" "$file1"  
 fi
 
+
+
+
 T125="ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
 T126="éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
 T127="ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
@@ -147,6 +150,82 @@ echo
 echo "libinote: starting tests"
 echo
 
+TMPDIR=$(mktemp -d)
+filea8=${TMPDIR}/test_utf8_symbol
+filea1=${TMPDIR}/test_latin1
+# quote=0xe2 0x80 0x99
+echo "l’ail" > $filea8
+# quote=0x27
+echo "l'ail" > $filea1
+testCharset $filea8 8-1 UTF-8:ISO-8859-1 $filea1
+
+cat <<EOF>$filea8
+«
+»
+‘
+’
+‚
+“
+”
+„
+‹
+›
+Ꮙ
+‛
+‟
+⍘
+⍞
+❛
+❜
+❝
+❞
+❮
+❯
+〝
+〞
+〟
+ꐄ
+ꐅ
+ꐆ
+ꐇ
+＂
+󠀢
+EOF
+
+cat <<EOF>$filea1
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+'
+EOF
+testCharset $filea8 8-1 UTF-8:ISO-8859-1 $filea1
+
 testCharset $file1 1-1 ISO-8859-1:ISO-8859-1 $file1
 testCharset $file8 8-8 UTF-8:UTF-8 $file8
 testCharset $file1 1-8 ISO-8859-1:UTF-8 $file8
@@ -156,9 +235,6 @@ testCharset $file8 8-1 UTF-8:ISO-8859-1 $file1
 # testCharset $file8_orig 8-8 UTF-8:UTF-8 $file8_orig
 # testCharset $file1_orig 1-8 ISO-8859-1:UTF-8 $file8_orig
 # testCharset $file8_orig 8-1 UTF-8:ISO-8859-1 $file1_orig
-
-
-TMPDIR=$(mktemp -d)
 
 if [ "$1" = "-g" ]; then
 	TMPFILE=${TMPDIR}/test_last

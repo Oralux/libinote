@@ -3,3 +3,5 @@ The libinote library preprocesses a text aimed to a text-to-speech engine:
 - output: type-length-value format.
 
 
+* Memo: version 
+The program version is stored in src/api/inote.h
