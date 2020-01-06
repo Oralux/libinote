@@ -415,8 +415,8 @@ static int convert_quote_to_ascii(wchar_t *buffer, size_t size) {
 			c=s[i]='\'';
 		  }
 		} else if ((s[i] == 0x13c9) || (s[i] == 0x13c9)
-				   || (s[i] == 0x2358) || (s[i] == 0x2359)
-				   || (s[i] >= 0x301d) || (s[i] <= 0x301f)
+				   || (s[i] == 0x235e) || (s[i] == 0x2358) || (s[i] == 0x2359)
+				   || ((s[i] >= 0x301d) && (s[i] <= 0x301f))
 				   || (s[i] == 0xff02)) {
 		  c=s[i]='\'';
 		}
@@ -497,7 +497,7 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
 	/* 
 	   EILSEQ:
 	   invalid multibyte sequence in the input:
-	   can be returned (even with //IGNORE) if a wide character has no
+	   occur (even with //IGNORE) if a wide character has no
 	   equivalent in the destination charset (e.g. latin1).
 
 	   The wide character is replaced if possible by an ascii quote or

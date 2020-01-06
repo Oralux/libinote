@@ -155,6 +155,11 @@ TMPDIR=$(mktemp -d)
 filea8=${TMPDIR}/test_utf8_symbol
 filea1=${TMPDIR}/test_latin1
 
+# currently utf8-t character without implemented equivalent are filtered 
+echo "cœur vaillant" > $filea8
+echo "cur vaillant" > $filea1
+testCharset $filea8 8-1 UTF-8:ISO-8859-1 $filea1
+
 echo "Produits • La Boutique" > $filea8
 echo "Produits  La Boutique" > $filea1
 testCharset $filea8 8-1 UTF-8:ISO-8859-1 $filea1
