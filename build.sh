@@ -15,6 +15,7 @@ Build libinote and tests.
 Options: 
 -c, --clean		   clean-up: delete the build directory and object files
 -d, --debug        compile with debug symbols 
+-g, --gdb		   with gdb
 -h, --help         display this help 
 -m, --mach <arch>  target architecture
 		   		   possible value: i686; by default: current arch
@@ -31,6 +32,8 @@ Example:
 # compile libinote, run tests
  $0 -t
 
+# compile libinote, run tests via gdb
+ $0 -dgt
 " 
 
 }
@@ -50,9 +53,9 @@ cleanup() {
 	(cd src/test && make clean)
 }
 
-unset CC CFLAGS CLEAN DBG_FLAGS HELP INSTALL ARCH STRIP TEST
+unset CC CFLAGS CLEAN DBG_FLAGS GDB HELP INSTALL ARCH STRIP TEST
 
-OPTIONS=`getopt -o cdhi:m:t --long clean,debug,help,install:,mach:,test \
+OPTIONS=`getopt -o cdghi:m:t --long clean,debug,gdb,help,install:,mach:,test \
              -n "$NAME" -- "$@"`
 [ $? != 0 ] && usage && exit 1
 eval set -- "$OPTIONS"
@@ -61,6 +64,7 @@ while true; do
   case "$1" in
     -c|--clean) CLEAN=1; shift;;
     -d|--debug) export DBG_FLAGS="-ggdb -DDEBUG"; export STRIP=test; shift;;
+    -g|--gdb) GDB="-g"; shift;;
     -h|--help) HELP=1; shift;;
     -i|--install) INSTALL=$2; shift 2;;
     -m|--mach) ARCH=$2; shift 2;;
@@ -91,7 +95,7 @@ cleanup
 CFLAGS="$DBG_FLAGS"
 unset LDFLAGS
 if [ "$ARCH" = "i686" ]; then
-	CFLAGS="$CFLAGS -m32"
+	CFLAGS="$CFLAGS -m32 -I/usr/i686-linux-gnu/include"
 	LDFLAGS="-m32"
 fi
 export CFLAGS=$CFLAGS
@@ -102,5 +106,5 @@ done
 
 if [ -n "$TEST" ]; then
 	cd src/test
-	./inote.sh
+	./inote.sh $GDB
 fi

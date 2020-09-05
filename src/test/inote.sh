@@ -6,6 +6,11 @@ rm -f /tmp/libinote.log.*
 #unset QUIET
 QUIET=1
 
+unset WITH_GDB
+if [ "$1" = "-g" ]; then
+	WITH_GDB=1
+fi
+
 testFileUrl="http://abu.cnam.fr/cgi-bin/donner_unformated?nddp1"
 file1_orig=nddp1.orig.txt
 file8_orig=nddp8${file1_orig#nddp1}
@@ -139,10 +144,17 @@ testCharset() {
 	CHARSETS=$3
 	FILE_EXPECTED=$4
 	# uncomment gdb if needed
-	# gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -c $CHARSETS -i $FILE -o $FILE.$SEP.tlv" ./text2tlv
+	if [ -n "$WITH_GDB" ]; then	
+		gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -c $CHARSETS -i $FILE -o $FILE.$SEP.tlv" ./text2tlv
+		exit 0
+	fi
 	./text2tlv       -p 1 -c $CHARSETS -i "$FILE" -o "$FILE.$SEP.tlv"
 	./tlv2text -i "$FILE.$SEP.tlv" -o "$FILE.$SEP.txt"
-	diff -q $FILE_EXPECTED $FILE.$SEP.txt || leave "$CHARSETS: KO" 1
+	diff -q $FILE_EXPECTED $FILE.$SEP.txt
+	if [ $? != 0 ]; then
+		diff -u $FILE_EXPECTED $FILE.$SEP.txt		
+		leave "$CHARSETS: KO" 1
+	fi
 	rm "$FILE.$SEP.tlv" "$FILE.$SEP.txt"
 	echo "charset $CHARSETS: OK"
 }
@@ -247,7 +259,7 @@ testCharset $file8 8-1 UTF-8:ISO-8859-1 $file1
 # testCharset $file1_orig 1-8 ISO-8859-1:UTF-8 $file8_orig
 # testCharset $file8_orig 8-1 UTF-8:ISO-8859-1 $file1_orig
 
-if [ "$1" = "-g" ]; then
+if [ -n "$WITH_GDB" ]; then
 	TMPFILE=${TMPDIR}/test_last
 	echo -en "${testArray[-1]}" > $TMPFILE
 	gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -p $PUNCT_MODE -i '$TMPFILE' -o '$TMPFILE.tlv'" -x gdb_commands ./text2tlv
