@@ -40,10 +40,10 @@ inote_error add_text(inote_tlv_t *tlv, void *user_data) {
   inote_error ret = INOTE_OK;
 
   if (t && fdo) {
-	if (1 != fwrite(t, tlv->length, 1, fdo)) {
-	  printf("%s: write error\n", __func__);
-	  ret = INOTE_IO_ERROR;
-	}
+    if (1 != fwrite(t, tlv->length, 1, fdo)) {
+      printf("%s: write error\n", __func__);
+      ret = INOTE_IO_ERROR;
+    }
   }
   
   return ret;
@@ -61,39 +61,39 @@ int main(int argc, char **argv)
   void *data = NULL;
   
   while ((opt = getopt(argc, argv, "i:o:")) != -1) {
-	switch (opt) {
-	case 'i':
-	  if (fdi)
-		fclose(fdi);
-	  fdi = fopen(optarg, "r");
-	  if (!fdi) {
-		perror(NULL);
-		exit(1);
-	  }
-	  if (stat(optarg, &statbuf)) {
-		perror(NULL);
-		exit(1);
-	  }
-	  break;
-	case 'o':
-	  if (fdo)
-		fclose(fdo);
-	  fdo = fopen(optarg, "w");
-	  if (!fdo) {
-		perror(NULL);
-		exit(1);
-	  }
-	  break;
-	default:
-	  usage();
-	  exit(1);
-	  break;
-	}
+    switch (opt) {
+    case 'i':
+      if (fdi)
+	fclose(fdi);
+      fdi = fopen(optarg, "r");
+      if (!fdi) {
+	perror(NULL);
+	exit(1);
+      }
+      if (stat(optarg, &statbuf)) {
+	perror(NULL);
+	exit(1);
+      }
+      break;
+    case 'o':
+      if (fdo)
+	fclose(fdo);
+      fdo = fopen(optarg, "w");
+      if (!fdo) {
+	perror(NULL);
+	exit(1);
+      }
+      break;
+    default:
+      usage();
+      exit(1);
+      break;
+    }
   }
   
   if (!fdi || !fdo) {
-	  usage();
-	  exit(1);	
+    usage();
+    exit(1);	
   }
   
   tlv_message.buffer = calloc(1, statbuf.st_size);
@@ -102,8 +102,8 @@ int main(int argc, char **argv)
   tlv_message.end_of_buffer = tlv_message.buffer + tlv_message.length;
 
   if (1 != fread(tlv_message.buffer, tlv_message.length, 1, fdi)) {
-	  printf("%s: read error\n", __func__);
-	  exit(1);
+    printf("%s: read error\n", __func__);
+    exit(1);
   }
   
   cb.add_annotation = add_text;
@@ -119,8 +119,11 @@ int main(int argc, char **argv)
   free(tlv_message.buffer);
   
   if (ret) {
-	printf("%s: error = %d\n", __func__, ret);
+    printf("%s: error = %d\n", __func__, ret);
   }
 
   return ret;  
 }
+/* local variables: */
+/* c-basic-offset: 2 */
+/* end: */

@@ -85,16 +85,16 @@ void DebugFileInit()
   struct stat buf;
   
   if (checkEnableCount)
-	return;
+    return;
 
   checkEnableCount = 1;
   
   char *home = getenv("HOME");
   if (!home)
-	return;
+    return;
   
   if (snprintf(filename, MAX_FILENAME, "%s/%s", home, ENABLE_LOG) >= MAX_FILENAME)
-	return;
+    return;
   
   fd = fopen(filename, "r");
   if (!fd)
@@ -119,9 +119,9 @@ void DebugFileInit()
     goto exit0;
 
   if (fstat(fileno(inoteDebugFile), &buf) || buf.st_mode & 0077) {
-	err("mode=%o", buf.st_mode);
-	fclose(inoteDebugFile);
-	inoteDebugFile = NULL;
+    err("mode=%o", buf.st_mode);
+    fclose(inoteDebugFile);
+    inoteDebugFile = NULL;
     goto exit0;
   }
   
@@ -129,7 +129,7 @@ void DebugFileInit()
 
  exit0:
   if (fd)
-	fclose(fd);    
+    fclose(fd);    
 }
 
 
@@ -142,3 +142,6 @@ void inoteDebugFileFinish()
   checkEnableCount = 0;
 }
 
+/* local variables: */
+/* c-basic-offset: 2 */
+/* end: */

@@ -5,7 +5,7 @@
 
 #define INOTE_VERSION_MAJOR 1
 #define INOTE_VERSION_MINOR 0
-#define INOTE_VERSION_PATCH 4
+#define INOTE_VERSION_PATCH 5
 
 typedef enum {
   INOTE_CHARSET_UNDEFINED = 0,
@@ -25,6 +25,7 @@ typedef enum {
   INOTE_TYPE_CHARSET=(1<<1),
   INOTE_TYPE_PUNCTUATION=INOTE_TYPE_TEXT+(1<<2),
   INOTE_TYPE_ANNOTATION=INOTE_TYPE_TEXT+(1<<3),
+  INOTE_TYPE_CAPITAL=INOTE_TYPE_TEXT+(1<<4),
 } inote_type_t;
 
 typedef enum {
@@ -36,22 +37,26 @@ typedef enum {
 
 /* inote_tlv_t 
 
-type, length, value description
-with 
-- type: see inote_type_t
-- length: 0..255
-- value: array of length bytes
+   type, length, value description
+   with 
+   - type: see inote_type_t
+   - length: 0..255
+   - value: array of length bytes
 
-Text
-type = INOTE_TYPE_TEXT
+   Text
+   type = INOTE_TYPE_TEXT
 
-Punctuation character (to be said)
-type = INOTE_TYPE_PUNCTUATION
-length = 1 + remaining text (first char=punctuation char, followed by text) 
+   Punctuation character (to be said)
+   type = INOTE_TYPE_PUNCTUATION
+   length = 1 + remaining text (first char=punctuation char, followed by text) 
 
-Annotation
-type = INOTE_TYPE_ANNOTATION
-length = annotation length
+   Annotation
+   type = INOTE_TYPE_ANNOTATION
+   length = annotation length
+
+   Capital
+   type = INOTE_TYPE_CAPITAL
+   length = number of capital letters
 
 */
 typedef struct {
@@ -138,10 +143,10 @@ void inote_delete(void *handle);
   remaining text points on this annotation.
 
   RETURN: INOTE_OK if no error, otherwise:
-    - INOTE_INVALID_MULTIBYTE: text_left is set; the first byte left is the invalid byte.
-    - INOTE_INCOMPLETE_MULTIBYTE: idem: text_left set; first byte left is the invalid byte.
-	- INOTE_LANGUAGE_SWITCHING: text_left is set; the first byte left is the annotation.
-    - ... 
+  - INOTE_INVALID_MULTIBYTE: text_left is set; the first byte left is the invalid byte.
+  - INOTE_INCOMPLETE_MULTIBYTE: idem: text_left set; first byte left is the invalid byte.
+  - INOTE_LANGUAGE_SWITCHING: text_left is set; the first byte left is the annotation.
+  - ... 
   
   Example
   input: text="`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"  
@@ -158,7 +163,7 @@ void inote_delete(void *handle);
   |-------------------+--------+------------------|
 
 */
-  inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message, size_t *text_left);
+inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message, size_t *text_left);
 
 /*
   tlv_message and cb are supplied by the caller.
@@ -187,7 +192,7 @@ void inote_delete(void *handle);
   text="Un <éléphant> (1)"  
 
 */
-  inote_error inote_convert_tlv_to_text(inote_slice_t *tlv_message, inote_cb_t *cb);
+inote_error inote_convert_tlv_to_text(inote_slice_t *tlv_message, inote_cb_t *cb);
 
 // convert an inote_error to string
 const char *inote_error_get_string(inote_error err);
@@ -196,3 +201,7 @@ const char *inote_error_get_string(inote_error err);
 void inoteDebugInit();
 
 #endif
+
+/* local variables: */
+/* c-basic-offset: 2 */
+/* end: */

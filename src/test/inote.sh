@@ -86,6 +86,18 @@ testLabel[$i]="utf-8 text + language switching annotation"
 testArray[$((i++))]="Un éléphant \`l0x12345678 One elephant"
 testRes[$((i++))]="Un éléphant"
 
+testLabel[$i]="all caps"
+testArray[$((i++))]="ÉLÉPHANT"
+testRes[$((i++))]=""
+
+testLabel[$i]="Alternate Caps 1"
+testArray[$((i++))]="UnÉlÉpHaNt"
+testRes[$((i++))]=""
+
+testLabel[$i]="Alternate Caps 2"
+testArray[$((i++))]="UNéLéphant"
+testRes[$((i++))]=""
+
 
 leave() {
 	echo "$1" && exit $2

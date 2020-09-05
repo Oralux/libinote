@@ -43,15 +43,15 @@ static inote_charset_t getCharset(const char* s) {
   inote_charset_t ret = INOTE_CHARSET_UNDEFINED;
 
   if (!strcmp(s, "ISO-8859-1")) {
-	ret = INOTE_CHARSET_ISO_8859_1;
+    ret = INOTE_CHARSET_ISO_8859_1;
   } else if (!strcmp(s, "GBK")) {
-	ret = INOTE_CHARSET_GBK;
+    ret = INOTE_CHARSET_GBK;
   } else if (!strcmp(s, "UCS-2")) {
-	ret = INOTE_CHARSET_UCS_2;
+    ret = INOTE_CHARSET_UCS_2;
   } else if (!strcmp(s, "SJIS")) {
-	ret = INOTE_CHARSET_SJIS;
+    ret = INOTE_CHARSET_SJIS;
   } else {
-	ret = INOTE_CHARSET_UTF_8;
+    ret = INOTE_CHARSET_UTF_8;
   }
   
   return ret;
@@ -83,52 +83,52 @@ int main(int argc, char **argv)
   *text.buffer = 0;
   
   while ((opt = getopt(argc, argv, "c:i:o:p:t:")) != -1) {
-	switch (opt) {
-	case 'c': {
-	  char *x = strchr(optarg, ':');
-	  if (!x) {
-		usage();
-		exit(1);
-	  }
-	  *x = 0;
-	  charset0 = getCharset(optarg);
-	  charset1 = getCharset(x+1);
-	}
-	  break;
-	case 'i':
-	  if (fdi)
-		fclose(fdi);
-	  fdi = fopen(optarg, "r");
-	  if (!fdi) {
-		perror(NULL);
-		exit(1);
-	  }
-	  break;
-	case 'o':
-	  output = creat(optarg, S_IRWXU);
-	  if (output==-1) {
-		perror(NULL);
-		exit(1);
-	  }
-	  break;
-	case 'p':
-	  punct_mode = atoi(optarg);
-	  break;
-	case 't':
-	  strncpy(text.buffer, optarg, TEXT_LENGTH_MAX);
-	  text.length = strlen(text.buffer);
-	  text.end_of_buffer = text.buffer + TEXT_LENGTH_MAX;	  
-	  break;
-	default:
-	  usage();
-	  exit(1);
-	  break;
-	}
+    switch (opt) {
+    case 'c': {
+      char *x = strchr(optarg, ':');
+      if (!x) {
+	usage();
+	exit(1);
+      }
+      *x = 0;
+      charset0 = getCharset(optarg);
+      charset1 = getCharset(x+1);
+    }
+      break;
+    case 'i':
+      if (fdi)
+	fclose(fdi);
+      fdi = fopen(optarg, "r");
+      if (!fdi) {
+	perror(NULL);
+	exit(1);
+      }
+      break;
+    case 'o':
+      output = creat(optarg, S_IRWXU);
+      if (output==-1) {
+	perror(NULL);
+	exit(1);
+      }
+      break;
+    case 'p':
+      punct_mode = atoi(optarg);
+      break;
+    case 't':
+      strncpy(text.buffer, optarg, TEXT_LENGTH_MAX);
+      text.length = strlen(text.buffer);
+      text.end_of_buffer = text.buffer + TEXT_LENGTH_MAX;	  
+      break;
+    default:
+      usage();
+      exit(1);
+      break;
+    }
   }
   
   if (!*text.buffer && !fdi) {
-	  usage();
-	  exit(1);	
+    usage();
+    exit(1);	
   }
 
 
@@ -149,97 +149,97 @@ int main(int argc, char **argv)
 
   void *handle = inote_create();
   if (!fdi) {
-	ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
-	switch (ret) {
-	case INOTE_INCOMPLETE_MULTIBYTE:
-	case INOTE_INVALID_MULTIBYTE:
-	  text.length -= text_left;
+    ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
+    switch (ret) {
+    case INOTE_INCOMPLETE_MULTIBYTE:
+    case INOTE_INVALID_MULTIBYTE:
+      text.length -= text_left;
+      ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
+      break;
+    case INOTE_LANGUAGE_SWITCHING: {
+      char *s = text.buffer + text.length - text_left;
+      int i;
+      for (i=0; i<text_left; i++) {
+	if (s[i] == ' ')
+	  break;
+      }
+      if (s[i] == ' ') {
+	s[i] = 0;
+	printf("annotation: %s\n", s);
+	i++;
+	if (i < text_left) {
+	  text_left -= i;
+	  text.buffer = s + i;
+	  text.length = text_left;
 	  ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
-	  break;
-	case INOTE_LANGUAGE_SWITCHING: {
-	  char *s = text.buffer + text.length - text_left;
-	  int i;
-	  for (i=0; i<text_left; i++) {
-		if (s[i] == ' ')
-		  break;
-	  }
-	  if (s[i] == ' ') {
-		s[i] = 0;
-		printf("annotation: %s\n", s);
-		i++;
-		if (i < text_left) {
-		  text_left -= i;
-		  text.buffer = s + i;
-		  text.length = text_left;
-		  ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
-		}
-	  }
 	}
-	default:
-	  break;
-	}
+      }
+    }
+    default:
+      break;
+    }
   } else {
-	bool loop = true;
-	while(loop) {
-	  size_t len = fread(text.buffer, 1, TEXT_LENGTH_MAX, fdi);
-	  if (!len)
-		break;
-	  text.length = len;
-	  text.charset = charset0;
-	  text.end_of_buffer = text.buffer + len;	  
-	  ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
-	  switch (ret) {
-	  case INOTE_INVALID_MULTIBYTE: {
-		int ret2;
-		text.length -= text_left;
-		text.buffer[text.length] = ' '; // ignore this byte
-		text.length++;
-		fseek(fdi, -text_left+1, SEEK_CUR); // +1 for the space character
-		ret2 = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
-		loop = (!ret2);
-	  }
-		break;
-	  case INOTE_INCOMPLETE_MULTIBYTE: {
-		int ret2;
-		text.length -= text_left;
-		fseek(fdi, -text_left, SEEK_CUR);
-		ret2 = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
-		loop = (!ret2);
-	  }
-		break;
-	  case INOTE_OK:
-		break;
-	  case INOTE_LANGUAGE_SWITCHING: {
-		char *s = text.buffer + text.length - text_left;
-		int i;
-		for (i=0; i<text_left; i++) {
-		  if (s[i] == ' ')
-			break;
-		}
-		if (s[i] == ' ') {
-		  s[i] = 0;
-		  printf("annotation: %s\n", s);
-		  i++;
-		  if (i < text_left) {
-			text_left -= i;
-			text.buffer = s + i;
-			text.length = text_left;
-			fseek(fdi, -text_left, SEEK_CUR);			
-			ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
-		}
+    bool loop = true;
+    while(loop) {
+      size_t len = fread(text.buffer, 1, TEXT_LENGTH_MAX, fdi);
+      if (!len)
+	break;
+      text.length = len;
+      text.charset = charset0;
+      text.end_of_buffer = text.buffer + len;	  
+      ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
+      switch (ret) {
+      case INOTE_INVALID_MULTIBYTE: {
+	int ret2;
+	text.length -= text_left;
+	text.buffer[text.length] = ' '; // ignore this byte
+	text.length++;
+	fseek(fdi, -text_left+1, SEEK_CUR); // +1 for the space character
+	ret2 = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
+	loop = (!ret2);
+      }
+	break;
+      case INOTE_INCOMPLETE_MULTIBYTE: {
+	int ret2;
+	text.length -= text_left;
+	fseek(fdi, -text_left, SEEK_CUR);
+	ret2 = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
+	loop = (!ret2);
+      }
+	break;
+      case INOTE_OK:
+	break;
+      case INOTE_LANGUAGE_SWITCHING: {
+	char *s = text.buffer + text.length - text_left;
+	int i;
+	for (i=0; i<text_left; i++) {
+	  if (s[i] == ' ')
+	    break;
+	}
+	if (s[i] == ' ') {
+	  s[i] = 0;
+	  printf("annotation: %s\n", s);
+	  i++;
+	  if (i < text_left) {
+	    text_left -= i;
+	    text.buffer = s + i;
+	    text.length = text_left;
+	    fseek(fdi, -text_left, SEEK_CUR);			
+	    ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
 	  }
 	}
-	  default:
-		loop = false;
-		break;
-	  }
-	  write(output, tlv_message.buffer, tlv_message.length);
-	  tlv_message.length = 0;
-	}
-	fclose(fdi);
+      }
+      default:
+	loop = false;
+	break;
+      }
+      write(output, tlv_message.buffer, tlv_message.length);
+      tlv_message.length = 0;
+    }
+    fclose(fdi);
   }
   if (ret) {
-	printf("%s: error = %d\n", __func__, ret);
+    printf("%s: error = %d\n", __func__, ret);
   }
   inote_delete(handle);
   write(output, tlv_message.buffer, tlv_message.length);
@@ -247,3 +247,6 @@ int main(int argc, char **argv)
 
   return ret;
 }
+/* local variables: */
+/* c-basic-offset: 2 */
+/* end: */
