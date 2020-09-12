@@ -31,73 +31,77 @@ T126="ééééééééééééééééééééééééééééééééééééé
 T127="ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
 T256=${T127}${T127}éé
 
-unset testArray testRes
+unset testArray
 i=0
 
 testLabel[$i]="utf-8 text"
 testArray[$((i++))]="   Un éléphant"
-testRes[$((i++))]="Un éléphant"
 
 testLabel[$i]="utf-8 text"
 testArray[$((i++))]=",   Un éléphant"
-testRes[$((i++))]=",   Un éléphant"
 
 testLabel[$i]="utf-8 text + filtered annotation + tag + punctuation"
 testArray[$((i++))]="  \`gfa1 \`gfa2 \`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"
-testRes[$((i++))]="Un <éléphant> (1)"
 
 testLabel[$i]="utf-8 text + annotation"
 testArray[$((i++))]=" \`v1 Un \`v2 éléphant"
-testRes[$((i++))]=""
 
 testLabel[$i]="1 tlv for 127 é (header=2 bytes + value=254 bytes)"
 testArray[$((i++))]=${T127}
-testRes[$((i++))]=""
 
 testLabel[$i]="2 tlv: 127 é + a"
 testArray[$((i++))]=${T127}a
-testRes[$((i++))]=""
 
 testLabel[$i]="1 tlv: a + 125 é"
 testArray[$((i++))]=a${T125}
-testRes[$((i++))]=""
 
 testLabel[$i]="2 tlv, last utf-8 splitted: a + 125 é + 4 bytes utf8 char 𪚥"
 testArray[$((i++))]=a${T125}𪚥
-testRes[$((i++))]=""
 
 testLabel[$i]="1025 bytes: a + 512 é"
 testArray[$((i++))]=$(echo -n "a$T256$T256")
-testRes[$((i++))]=""
 
 testLabel[$i]="6 bytes: é + 2 erroneous utf-8 bytes + é"
 testArray[$((i++))]=$(echo -en "é\xca\xfeé")
-testRes[$((i++))]=""
 
 testLabel[$i]="256 bytes: 127 é + 2 erroneous bytes"
 testArray[$((i++))]=$(echo -en "${T127}\xca\xfe")
-testRes[$((i++))]=""
 
 testLabel[$i]="257 bytes: a + 127 é + 2 erroneous bytes"
 testArray[$((i++))]=$(echo -en "a${T127}\xca\xfe")
-testRes[$((i++))]=""
 
 testLabel[$i]="utf-8 text + language switching annotation"
 testArray[$((i++))]="Un éléphant \`l0x12345678 One elephant"
-testRes[$((i++))]="Un éléphant"
 
-testLabel[$i]="all caps"
-testArray[$((i++))]="ÉLÉPHANT"
-testRes[$((i++))]=""
+# ---> BEGIN CAPS TEST
+CAPITAL_BEGIN=$i
+testLabel[$i]="word with same capitalization #1"
+testArray[$((i++))]="CAPITAL LETTER"
 
-testLabel[$i]="Alternate Caps 1"
-testArray[$((i++))]="UnÉlÉpHaNt"
-testRes[$((i++))]=""
+testLabel[$i]="word with same capitalization #2"
+testArray[$((i++))]="capital Letter"
 
-testLabel[$i]="Alternate Caps 2"
-testArray[$((i++))]="UNéLéphant"
-testRes[$((i++))]=""
+testLabel[$i]="first word with capital letter and the remaining text as lower case #1"
+testArray[$((i++))]="Capital letter"
 
+testLabel[$i]="first word with capital letter and the remaining text as lower case #2"
+testArray[$((i++))]="CaPital letter"
+
+testLabel[$i]="first word all caps and the remaining text as lower case"
+testArray[$((i++))]="CAPITAL letter"
+
+testLabel[$i]="text as lower case"
+testArray[$((i++))]="capital letter"
+
+# (2+3) + 250 + (1 + 1+1) = 256 + 2
+testLabel[$i]="2 tlv, last capital tag splitted #1: abc + 125 é + A"
+testArray[$((i++))]="abc${T125}A"
+
+CAPITAL_END=$i
+# (2+2) + 250 + (1+1 +1) = 256 + 1
+testLabel[$i]="2 tlv + last capital tag splitted #2: ab + 125 é + A"
+testArray[$((i++))]="ab${T125}A"
+# <--- END CAPS TESTS
 
 leave() {
 	echo "$1" && exit $2
@@ -119,6 +123,8 @@ convertFile() {
 	LABEL=$2
 	FILE=$3
 	PUNCT_MODE=$4
+	local caps_mode=$5
+	local caps_prefix=""
 	if [ -z "$QUIET" ]; then	
 		echo
 		echo "* $NUM. $LABEL"
@@ -134,7 +140,8 @@ convertFile() {
 		hexdump -Cv "$FILE.tlv"
 	fi
 
-	./tlv2text -i "$FILE.tlv" -o "$FILE.txt"
+	[ "$caps_mode" = 1 ] && caps_prefix="beep"
+	./tlv2text -i "$FILE.tlv" -o "$FILE.txt" -c "$caps_prefix"
 	if [ -z "$QUIET" ]; then	
 		echo "output:"
 		cat "$FILE.txt"
@@ -281,8 +288,10 @@ else
 	for i in "${testArray[@]}"; do
 		TMPFILE=${TMPDIR}/test_$j
 		echo -en "$i" > $TMPFILE
-#		rm -f "$FILE.tlv" "$FILE.txt" 
-		convertFile $j "${testLabel[$j]}" "$TMPFILE" $PUNCT_MODE
+		#		rm -f "$FILE.tlv" "$FILE.txt"
+		CAPS_MODE=0
+		[ "$j" -ge "$CAPITAL_BEGIN" ] && [ "$j" -le "$CAPITAL_END" ] && CAPS_MODE=1
+		convertFile $j "${testLabel[$j]}" "$TMPFILE" $PUNCT_MODE $CAPS_MODE
 		j=$((j+1))
 	done
 fi

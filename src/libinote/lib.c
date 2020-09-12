@@ -129,7 +129,7 @@ static size_t min_size(size_t a, size_t b) {
 }
 
 static bool cb_check(const inote_cb_t *self) {
-  return (self && self->add_text && self->add_punctuation && self->add_annotation && self->add_charset);
+  return (self && self->add_text && self->add_punctuation && self->add_annotation && self->add_charset && self->add_capital);
 }
 
 static bool slice_check(const inote_slice_t *self) {
@@ -427,6 +427,7 @@ static int convert_quote_to_ascii(wchar_t *buffer, size_t size) {
   return c;
 }
 
+
 static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
   ENTER();
   char *outbuf0, *outbuf;
@@ -437,6 +438,10 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
   int status;
   int err = 0;
   char32_t *t, *t0, *tmax;
+  int cap_nb = 0;
+  enum {SPACE, UPPER_CASE, OTHER_CHAR};
+  int prev_char = SPACE;
+  wctype_t upper = wctype("upper");
 
   if (!self || !segment || !tlv) {
     goto exit0;
@@ -450,6 +455,19 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
   t = t0 = segment_get_buffer(segment);
   tmax = segment_get_max(segment);
 
+  inoteDebugDump("t=", (uint8_t*)t, 20);
+
+  if (first == INOTE_TYPE_TEXT) {
+    if (iswctype(*t, upper)) {
+      first = INOTE_TYPE_CAPITAL;
+      cap_nb = 1;
+      prev_char = UPPER_CASE;
+      dbg("First char: uppercase");
+    } else if (!iswblank(*(t-1))) {
+      prev_char = OTHER_CHAR;
+    }	
+  }
+  
   // the first char is considered as text
   t++;
 
@@ -468,22 +486,67 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
       t++;
     }
   } else {
-    
-    while ((t < tmax) && !iswpunct(*t)) {
-      t++;
+    // retrieve the longest text and compute the number of capital
+    // letters (cap_nb) according to these rules:
+    //
+    // - text without punctuation character
+    //
+    // and
+    //
+    // - word with same capitalization, for example:
+    //   "CAPITAL LETTER": gives text="CAPITAL " + cap_nb=7
+    //   "capital Letter": text="capital ", cap_nb=0
+    //
+    // - or first word with capital letter and the remaining text as lower case,
+    //   "Capital letter": text="Capital letter", cap_nb=1
+    //   "CaPital letter": text="Ca" + cap_nb=1
+    //
+    // - or first word all caps and the remaining text as lower case,
+    //   "CAPITAL letter": text="CAPITAL letter" + cap_nb=7
+    //
+    // - or text as lower case,
+    //   "capital letter": text="capital letter", cap_nb=0
+    //
+
+    for (; (t < tmax) && !iswpunct(*t); t++) {      
+      if (iswblank(*t)) {
+	prev_char = SPACE;
+	continue;
+      }
+
+      if (iswctype(*t, upper)) {
+	dbg("uppercase");
+	if (prev_char != UPPER_CASE) {
+	  // for examples, "CaPital letter" gives "Ca"  
+	  // or "CAPITAL LETTER" gives "CAPITAL "
+	  break;
+	}
+	cap_nb++;
+      } else {
+	prev_char = OTHER_CHAR;
+      }
     }
   }
 
+  if (cap_nb > 1) {
+    tlv->header->type = INOTE_TYPE_CAPITALS;
+  }
+  
   segment->s.length = inbytes0 = (uint8_t*)t - (uint8_t*)t0;
   outbuf = outbuf0 = (char*)tlv_get_free_byte(tlv);
   max_outbytesleft = outbytesleft = outbytesleft0 = tlv_get_free_size(tlv);
   inbuf0 = (char*)segment->s.buffer;
 
-  dbg("iconv");
+  dbg("iconv1");
   status = iconv(self->cd_from_char32[tlv->s->charset],
 		 (char**)&segment->s.buffer, &segment->s.length,
 		 &outbuf, &outbytesleft);
-  err = errno;
+
+  if (status == -1) {
+    err = errno;
+    dbg("iconv1: err=%s", strerror(err));
+  }
+  
   if (!status || (err == E2BIG)) {
     uint16_t length = max_outbytesleft - outbytesleft;
     ret = tlv_add_length(tlv, &length);
@@ -517,9 +580,16 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
     segment->s.length = inbytes0;
     outbuf = outbuf0;
     outbytesleft = outbytesleft0;
+    dbg("iconv2");      
     status = iconv(self->cd_from_char32[tlv->s->charset],
 		   (char**)&segment->s.buffer, &segment->s.length,
 		   &outbuf, &outbytesleft);
+
+    if (status == -1) {
+      err = errno;
+      dbg("iconv2: err=%s", strerror(err));      
+    }
+    
     if (!status || (err == E2BIG) || (err == EILSEQ)) {
       // return the whole buffer even in case of filtered characters
       uint16_t length = max_outbytesleft - outbytesleft;
@@ -933,6 +1003,7 @@ inote_error inote_convert_tlv_to_text(inote_slice_t *tlv_message, inote_cb_t *cb
   inote_error ret = INOTE_OK;
   inote_tlv_t *tlv;
   uint8_t *t, *tmax;
+  bool capitals = false;
 
   if (!cb_check(cb)) {
     ret = INOTE_ARGS_ERROR;
@@ -951,17 +1022,22 @@ inote_error inote_convert_tlv_to_text(inote_slice_t *tlv_message, inote_cb_t *cb
   while ((t <= tmax) && !ret) {
     tlv = (inote_tlv_t*)t;
     switch (tlv->type) {
+    case INOTE_TYPE_TEXT:
+      cb->add_text(tlv, cb->user_data);
+      break;
+    case INOTE_TYPE_CAPITALS:
+      capitals = true;
+    case INOTE_TYPE_CAPITAL:
+      cb->add_capital(tlv, capitals, cb->user_data);
+      break;
+    case INOTE_TYPE_PUNCTUATION:
+      cb->add_punctuation(tlv, cb->user_data);
+      break;
     case INOTE_TYPE_ANNOTATION:
       cb->add_annotation(tlv, cb->user_data);
       break;
     case INOTE_TYPE_CHARSET:
       cb->add_charset(tlv, cb->user_data);
-      break;
-    case INOTE_TYPE_PUNCTUATION:
-      cb->add_punctuation(tlv, cb->user_data);
-      break;
-    case INOTE_TYPE_TEXT:
-      cb->add_text(tlv, cb->user_data);
       break;
     default:
       dbg("wrong tlv (%p)", (void*)tlv);

@@ -26,6 +26,7 @@ typedef enum {
   INOTE_TYPE_PUNCTUATION=INOTE_TYPE_TEXT+(1<<2),
   INOTE_TYPE_ANNOTATION=INOTE_TYPE_TEXT+(1<<3),
   INOTE_TYPE_CAPITAL=INOTE_TYPE_TEXT+(1<<4),
+  INOTE_TYPE_CAPITALS=INOTE_TYPE_TEXT+(1<<4)+(1<<1),
 } inote_type_t;
 
 typedef enum {
@@ -107,12 +108,14 @@ typedef inote_error (*inote_add_annotation_t)(inote_tlv_t *tlv, void *user_data)
 typedef inote_error (*inote_add_charset_t)(inote_tlv_t *tlv, void *user_data);  
 typedef inote_error (*inote_add_punct_t)(inote_tlv_t *tlv, void *user_data);  
 typedef inote_error (*inote_add_text_t)(inote_tlv_t *tlv, void *user_data);  
+typedef inote_error (*inote_add_capital_t)(inote_tlv_t *tlv, bool capitals, void *user_data);  
 
 typedef struct {
   inote_add_annotation_t add_annotation;
   inote_add_charset_t add_charset;
   inote_add_punct_t add_punctuation;
   inote_add_text_t add_text;
+  inote_add_capital_t add_capital;
   void *user_data;
 } inote_cb_t;
 

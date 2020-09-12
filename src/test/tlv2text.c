@@ -1,5 +1,5 @@
-// --> For getopt
-#define _XOPEN_SOURCE 1
+// --> For strdup, getopt
+#define _POSIX_C_SOURCE 200809L
 // <--
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,19 +20,24 @@ enum {
   FRENCH,  
 } language_t; 
 
+static char *prefix_capital;
+static char *prefix_capitals;
+
 void usage() {
   printf("\
 Usage: tlv2text -i inputfile -o outputfile\n\
 Convert a type-length-value formatted file to text\n\
   -i inputfile    read tlv from file\n\
   -o outputfile   write text to this file\n\
+  -c capital      optional word to insert when a capital is detected.\n\
+                  spaces will be added around his word.\n\
+                  #n will be appended in case of several capitals.\n\
 \n\
 EXAMPLE:\n\
-tlv2text -i file.tlv -o file.tlv\n\
+tlv2text -i file.tlv -o file.tlv -c beep\n\
 \n\
 ");
 }
-
 
 inote_error add_text(inote_tlv_t *tlv, void *user_data) {
   FILE *fdo = (FILE*)user_data;
@@ -49,6 +54,21 @@ inote_error add_text(inote_tlv_t *tlv, void *user_data) {
   return ret;
 }
 
+inote_error add_capital(inote_tlv_t *tlv, bool capitals, void *user_data) {
+  FILE *fdo = (FILE*)user_data;
+  inote_error ret = INOTE_OK;
+  const char *prefix = capitals ? prefix_capitals : prefix_capital; 
+
+  if (!fdo || !prefix) {
+    printf("%s: args error\n", __func__);
+    return INOTE_IO_ERROR;
+  }
+  
+  fwrite(prefix, strlen(prefix), 1, fdo);
+  
+  return add_text(tlv, user_data);
+}
+
 int main(int argc, char **argv)
 {
   int opt; 
@@ -59,8 +79,11 @@ int main(int argc, char **argv)
   struct stat statbuf;
   inote_cb_t cb;
   void *data = NULL;
+
+  prefix_capital = strdup("");
+  prefix_capitals = strdup("");
   
-  while ((opt = getopt(argc, argv, "i:o:")) != -1) {
+  while ((opt = getopt(argc, argv, "i:o:c:")) != -1) {
     switch (opt) {
     case 'i':
       if (fdi)
@@ -82,6 +105,19 @@ int main(int argc, char **argv)
       if (!fdo) {
 	perror(NULL);
 	exit(1);
+      }
+      break;
+    case 'c':
+      {
+	size_t len = strlen(optarg);
+	free(prefix_capital);
+	free(prefix_capitals);
+	prefix_capital = calloc(1, len+10);
+	prefix_capitals = calloc(1, len+10);
+	if (len) {
+	  snprintf(prefix_capital, len+10, " %s ", optarg);
+	  snprintf(prefix_capitals, len+10, " %s#n ", optarg);
+	}
       }
       break;
     default:
@@ -110,6 +146,7 @@ int main(int argc, char **argv)
   cb.add_charset = add_text;
   cb.add_punctuation = add_text;
   cb.add_text = add_text;  
+  cb.add_capital = add_capital;  
   cb.user_data = (void *)fdo;  
 
   inote_convert_tlv_to_text(&tlv_message, &cb);
@@ -117,6 +154,8 @@ int main(int argc, char **argv)
   fclose(fdi);
   fclose(fdo);
   free(tlv_message.buffer);
+  free(prefix_capital);
+  free(prefix_capitals);
   
   if (ret) {
     printf("%s: error = %d\n", __func__, ret);
