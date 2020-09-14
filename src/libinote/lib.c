@@ -1051,6 +1051,25 @@ inote_error inote_convert_tlv_to_text(inote_slice_t *tlv_message, inote_cb_t *cb
   dbg("LEAVE(%s)", inote_error_get_string(ret));  
   return ret;
 }
+
+inote_error inote_slice_get_type(const inote_slice_t *tlv_message, inote_type_t *type) {
+  ENTER();
+  inote_error ret = INOTE_OK;
+  inote_tlv_t *tlv;
+
+  if (!slice_check(tlv_message) || !type) {
+    ret = INOTE_ARGS_ERROR;
+    goto exit0;
+  }  
+
+  tlv = (inote_tlv_t*)tlv_message->buffer;
+  *type = tlv->type;
+
+ exit0:
+  dbg("LEAVE(%s)", inote_error_get_string(ret));  
+  return ret;
+}
+
 /* local variables: */
 /* c-basic-offset: 2 */
 /* end: */
