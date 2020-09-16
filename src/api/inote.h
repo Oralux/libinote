@@ -263,6 +263,24 @@ inote_error inote_slice_get_type(const inote_slice_t *tlv_message, inote_type_t 
 */
 const char *inote_error_get_string(inote_error err);
 
+/**
+   Generate tlv compatible with an older version.
+   
+   This function indicates the version of libinote which will be used to decode the tlv.
+   inote_convert_text_to_tlv() will then generate TLV compatible with this version.
+
+   For example, TLV indicating capitalized words (INOTE_TYPE_CAPITAL)
+   will be generated only if the version supplied is greater or equal
+   to 1.0.5.
+
+   @param[in] handle  inote instance
+   @param version_major  e.g. 1 for version 1.0.5 
+   @param version_minor  e.g. 0 for version 1.0.5
+   @param version_major  e.g. 5 for version 1.0.5
+   @return inote_error
+*/
+inote_error inote_set_compatibility(void *handle, int version_major, int version_minor, int version_patch);
+
 /** debug */
 void inoteDebugInit();
 

@@ -30,6 +30,8 @@ Convert a text to a type-length-value byte buffer\n\
   -t text               text to convert to tlv\n\
   -c charset0:charset1  optional charsets: set0 = text charset, set1 = tlv charset. By Default: UTF-8.\n\
                         possible choices: ISO-8859-1, GBK, UCS-2, SJIS or UTF-8.\n\
+  -v version            optional backward compatibility with this older version.\n\
+                        e.g. -v 104 for version 1.0.4\n\
 \n\
 EXAMPLE:\n\
 text2tlv -p 0 -t \"Hello, world\" > tlv\n\
@@ -74,6 +76,7 @@ int main(int argc, char **argv)
   uint8_t tlv_message_buffer[TLV_MESSAGE_LENGTH_MAX];
   inote_charset_t charset0 = INOTE_CHARSET_UTF_8;
   inote_charset_t charset1 = INOTE_CHARSET_UTF_8;
+  int version_compat = -1;
   
   memset(&text, 0, sizeof(text));
   memset(&tlv_message, 0, sizeof(tlv_message));
@@ -82,7 +85,7 @@ int main(int argc, char **argv)
   text.buffer = text_buffer;
   *text.buffer = 0;
   
-  while ((opt = getopt(argc, argv, "c:i:o:p:t:")) != -1) {
+  while ((opt = getopt(argc, argv, "c:i:o:p:t:v:")) != -1) {
     switch (opt) {
     case 'c': {
       char *x = strchr(optarg, ':');
@@ -119,6 +122,9 @@ int main(int argc, char **argv)
       text.length = strlen(text.buffer);
       text.end_of_buffer = text.buffer + TEXT_LENGTH_MAX;	  
       break;
+    case 'v':
+      version_compat = atoi(optarg);
+      break;
     default:
       usage();
       exit(1);
@@ -148,6 +154,13 @@ int main(int argc, char **argv)
   tlv_message.charset = charset1;
 
   void *handle = inote_create();
+  if (version_compat != -1) {
+    int major, minor, patch;
+    major = version_compat/100;
+    minor = (version_compat%100)/10;
+    patch = version_compat%10;
+    inote_set_compatibility(handle, major, minor, patch);
+  }
   if (!fdi) {
     ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
     switch (ret) {

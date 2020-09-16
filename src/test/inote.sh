@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 touch $HOME/libinote.ok
 rm -f /tmp/libinote.log.*
@@ -97,11 +97,17 @@ testArray[$((i++))]="capital letter"
 testLabel[$i]="2 tlv, last capital tag splitted #1: abc + 125 é + A"
 testArray[$((i++))]="abc${T125}A"
 
-CAPITAL_END=$i
 # (2+2) + 250 + (1+1 +1) = 256 + 1
 testLabel[$i]="2 tlv + last capital tag splitted #2: ab + 125 é + A"
 testArray[$((i++))]="ab${T125}A"
+CAPITAL_END=$i
 # <--- END CAPS TESTS
+# ---> BEGIN CAPS DEACTIVATED TEST
+CAPITAL_DEACTIVATED_BEGIN=$i
+testLabel[$i]="first word with capital letter and the remaining text as lower case #2"
+testArray[$((i++))]="CaPital letter"
+CAPITAL_DEACTIVATED_END=$i
+# <--- END CAPS DEACTIVATED TESTS
 
 leave() {
 	echo "$1" && exit $2
@@ -124,6 +130,7 @@ convertFile() {
 	FILE=$3
 	PUNCT_MODE=$4
 	local caps_mode=$5
+	local version_compat=$6
 	local caps_prefix=""
 	if [ -z "$QUIET" ]; then	
 		echo
@@ -133,7 +140,8 @@ convertFile() {
 		echo
 	fi
 	
-	./text2tlv -p $PUNCT_MODE -i "$FILE" -o "$FILE.tlv"
+	[ "$version_compat" != -1 ] && args="-v $version_compat"
+	./text2tlv -p $PUNCT_MODE -i "$FILE" -o "$FILE.tlv" $args
 
 	if [ -z "$QUIET" ]; then	
 		echo "tlv:"
@@ -290,8 +298,11 @@ else
 		echo -en "$i" > $TMPFILE
 		#		rm -f "$FILE.tlv" "$FILE.txt"
 		CAPS_MODE=0
-		[ "$j" -ge "$CAPITAL_BEGIN" ] && [ "$j" -le "$CAPITAL_END" ] && CAPS_MODE=1
-		convertFile $j "${testLabel[$j]}" "$TMPFILE" $PUNCT_MODE $CAPS_MODE
+		VERSION_COMPAT=-1
+		[ "$j" -ge "$CAPITAL_BEGIN" ] && [ "$j" -lt "$CAPITAL_END" ] && CAPS_MODE=1
+		# version 1.0.4 is not compatible with the TLV for capital letters (from version 1.0.5)
+		[ "$j" -ge "$CAPITAL_DEACTIVATED_BEGIN" ] && [ "$j" -lt "$CAPITAL_DEACTIVATED_END" ] && VERSION_COMPAT=104
+		convertFile $j "${testLabel[$j]}" "$TMPFILE" $PUNCT_MODE $CAPS_MODE $VERSION_COMPAT
 		j=$((j+1))
 	done
 fi

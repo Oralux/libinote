@@ -49,6 +49,14 @@ static const predef_t xml_predefined_entity[] = {
 #define MAX_ENTITY_NB (sizeof(xml_predefined_entity)/sizeof(xml_predefined_entity[0]))
 
 typedef struct {
+  int minor;
+  int major;
+  int patch;
+} version_t;
+
+#define VERSION_COMPAT_CAPITAL (version_t){1,0,5}
+
+typedef struct {
   uint32_t magic;
   char32_t char32_buf[MAX_CHAR32];
   iconv_t cd_to_char32[MAX_CHARSET];
@@ -58,7 +66,11 @@ typedef struct {
   // removing_leading_space: true if leading space must still be removed
   // (legacy fix at init for vv in text mode and spaces from the
   // initial and filtered 'gfax)
-  bool removing_leading_space; 
+  bool removing_leading_space;
+  // backward_compatibility:
+  // the TLV generated must be compatible with this version.
+  version_t backward_compatibility;
+  bool capital_activated; // the INOTE_TYPE_CAPITAL(s) TLV can be generated
 } inote_t;
 
 typedef struct {
@@ -458,7 +470,7 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
   inoteDebugDump("t=", (uint8_t*)t, 20);
 
   if (first == INOTE_TYPE_TEXT) {
-    if (iswctype(*t, upper)) {
+    if (self->capital_activated && iswctype(*t, upper)) {
       first = INOTE_TYPE_CAPITAL;
       cap_nb = 1;
       prev_char = UPPER_CASE;
@@ -514,7 +526,7 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
 	continue;
       }
 
-      if (iswctype(*t, upper)) {
+      if (self->capital_activated && iswctype(*t, upper)) {
 	dbg("uppercase");
 	if (prev_char != UPPER_CASE) {
 	  // for examples, "CaPital letter" gives "Ca"  
@@ -860,7 +872,8 @@ void *inote_create() {
     for (i=0; i<MAX_CHARSET; i++) {
       self->cd_to_char32[i] = ICONV_ERROR;
       self->cd_from_char32[i] = ICONV_ERROR;
-    }	
+    }
+    self->capital_activated = true;
   }
   return self;
 }
@@ -1065,6 +1078,29 @@ inote_error inote_slice_get_type(const inote_slice_t *tlv_message, inote_type_t 
   tlv = (inote_tlv_t*)tlv_message->buffer;
   *type = tlv->type;
 
+ exit0:
+  dbg("LEAVE(%s)", inote_error_get_string(ret));  
+  return ret;
+}
+
+inote_error inote_set_compatibility(void *handle, int version_major, int version_minor, int version_patch) {
+  ENTER();
+  inote_error ret = INOTE_OK;
+  inote_t *self;
+  version_t v;
+
+  if (!handle || ( (self=(inote_t*)handle)->magic != MAGIC)) {
+    ret = INOTE_ARGS_ERROR;
+    goto exit0;
+  }
+
+  self->backward_compatibility = (version_t){version_major, version_minor, version_patch};
+
+  v = VERSION_COMPAT_CAPITAL;
+  self->capital_activated = ((version_major <= v.major)
+			     && (version_minor <= v.minor)
+			     && (version_patch < v.patch));
+  
  exit0:
   dbg("LEAVE(%s)", inote_error_get_string(ret));  
   return ret;
