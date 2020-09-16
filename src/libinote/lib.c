@@ -54,7 +54,7 @@ typedef struct {
   int patch;
 } version_t;
 
-#define VERSION_COMPAT_CAPITAL (version_t){1,0,5}
+#define VERSION_COMPAT_CAPITAL (version_t){1,1,0}
 
 typedef struct {
   uint32_t magic;

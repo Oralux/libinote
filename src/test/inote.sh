@@ -300,7 +300,7 @@ else
 		CAPS_MODE=0
 		VERSION_COMPAT=-1
 		[ "$j" -ge "$CAPITAL_BEGIN" ] && [ "$j" -lt "$CAPITAL_END" ] && CAPS_MODE=1
-		# version 1.0.4 is not compatible with the TLV for capital letters (from version 1.0.5)
+		# version 1.0.4 is not compatible with the TLV for capital letters (from version 1.1.0)
 		[ "$j" -ge "$CAPITAL_DEACTIVATED_BEGIN" ] && [ "$j" -lt "$CAPITAL_DEACTIVATED_END" ] && VERSION_COMPAT=104
 		convertFile $j "${testLabel[$j]}" "$TMPFILE" $PUNCT_MODE $CAPS_MODE $VERSION_COMPAT
 		j=$((j+1))
