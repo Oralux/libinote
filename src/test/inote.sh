@@ -104,9 +104,15 @@ CAPITAL_END=$i
 # <--- END CAPS TESTS
 # ---> BEGIN CAPS DEACTIVATED TEST
 CAPITAL_DEACTIVATED_BEGIN=$i
-testLabel[$i]="first word with capital letter and the remaining text as lower case #2"
+testLabel[$i]="capital deactivated; first word with capital letter and the remaining text as lower case #2"
 testArray[$((i++))]="CaPital letter"
 CAPITAL_DEACTIVATED_END=$i
+# <--- END CAPS DEACTIVATED TESTS
+# ---> BEGIN CAPS ACTIVATED TEST
+CAPITAL_ACTIVATED_BEGIN=$i
+testLabel[$i]="capital activated; first word with capital letter and the remaining text as lower case #2"
+testArray[$((i++))]="CaPital letter"
+CAPITAL_ACTIVATED_END=$i
 # <--- END CAPS DEACTIVATED TESTS
 
 leave() {
@@ -302,6 +308,7 @@ else
 		[ "$j" -ge "$CAPITAL_BEGIN" ] && [ "$j" -lt "$CAPITAL_END" ] && CAPS_MODE=1
 		# version 1.0.4 is not compatible with the TLV for capital letters (from version 1.1.0)
 		[ "$j" -ge "$CAPITAL_DEACTIVATED_BEGIN" ] && [ "$j" -lt "$CAPITAL_DEACTIVATED_END" ] && VERSION_COMPAT=104
+		[ "$j" -ge "$CAPITAL_ACTIVATED_BEGIN" ] && [ "$j" -lt "$CAPITAL_ACTIVATED_END" ] && VERSION_COMPAT=110
 		convertFile $j "${testLabel[$j]}" "$TMPFILE" $PUNCT_MODE $CAPS_MODE $VERSION_COMPAT
 		j=$((j+1))
 	done

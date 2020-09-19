@@ -271,15 +271,15 @@ const char *inote_error_get_string(inote_error err);
 
    For example, TLV indicating capitalized words (INOTE_TYPE_CAPITAL)
    will be generated only if the version supplied is greater or equal
-   to 1.0.5.
+   to 1.1.0.
 
    @param[in] handle  inote instance
-   @param version_major  e.g. 1 for version 1.0.5 
-   @param version_minor  e.g. 0 for version 1.0.5
-   @param version_major  e.g. 5 for version 1.0.5
+   @param major  e.g. 1 for version 1.2.3
+   @param minor  e.g. 2 for version 1.2.3
+   @param major  e.g. 3 for version 1.2.3
    @return inote_error
 */
-inote_error inote_set_compatibility(void *handle, int version_major, int version_minor, int version_patch);
+inote_error inote_set_compatibility(void *handle, int major, int minor, int patch);
 
 /** debug */
 void inoteDebugInit();

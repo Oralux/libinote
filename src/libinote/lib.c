@@ -1083,23 +1083,27 @@ inote_error inote_slice_get_type(const inote_slice_t *tlv_message, inote_type_t 
   return ret;
 }
 
-inote_error inote_set_compatibility(void *handle, int version_major, int version_minor, int version_patch) {
-  ENTER();
+inote_error inote_set_compatibility(void *handle, int major, int minor, int patch) {
+  dbg("ENTER major:%d, minor:%d, patch:%d", major, minor, patch);
   inote_error ret = INOTE_OK;
   inote_t *self;
-  version_t v;
+  version_t minimal_version = VERSION_COMPAT_CAPITAL;
 
   if (!handle || ( (self=(inote_t*)handle)->magic != MAGIC)) {
     ret = INOTE_ARGS_ERROR;
     goto exit0;
   }
 
-  self->backward_compatibility = (version_t){version_major, version_minor, version_patch};
+  self->backward_compatibility = (version_t){major, minor, patch};
 
-  v = VERSION_COMPAT_CAPITAL;
-  self->capital_activated = ((version_major <= v.major)
-			     && (version_minor <= v.minor)
-			     && (version_patch < v.patch));
+  self->capital_activated = (major > minimal_version.major)
+    || ((major == minimal_version.major)
+	&& ((minor > minimal_version.minor)
+	    || ((minor == minimal_version.minor)
+		&& (patch >= minimal_version.patch))));
+
+  if (self->capital_activated)
+    dbg("capital activated\n");
   
  exit0:
   dbg("LEAVE(%s)", inote_error_get_string(ret));  
