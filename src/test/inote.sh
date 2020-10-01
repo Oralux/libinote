@@ -112,6 +112,12 @@ CAPITAL_DEACTIVATED_END=$i
 CAPITAL_ACTIVATED_BEGIN=$i
 testLabel[$i]="capital activated; first word with capital letter and the remaining text as lower case #2"
 testArray[$((i++))]="CaPital letter"
+
+testLabel[$i]="word with capital letter followed by a not-to-spell punctuation char"
+testArray[$((i++))]="Voxin: "
+
+testLabel[$i]="lower case word followed by a not-to-spell punctuation char"
+testArray[$((i++))]="voxin: "
 CAPITAL_ACTIVATED_END=$i
 # <--- END CAPS DEACTIVATED TESTS
 
@@ -306,9 +312,17 @@ else
 		CAPS_MODE=0
 		VERSION_COMPAT=-1
 		[ "$j" -ge "$CAPITAL_BEGIN" ] && [ "$j" -lt "$CAPITAL_END" ] && CAPS_MODE=1
+
 		# version 1.0.4 is not compatible with the TLV for capital letters (from version 1.1.0)
-		[ "$j" -ge "$CAPITAL_DEACTIVATED_BEGIN" ] && [ "$j" -lt "$CAPITAL_DEACTIVATED_END" ] && VERSION_COMPAT=104
-		[ "$j" -ge "$CAPITAL_ACTIVATED_BEGIN" ] && [ "$j" -lt "$CAPITAL_ACTIVATED_END" ] && VERSION_COMPAT=110
+		# Corresponds to sequence CAPITAL_DEACTIVATED_BEGIN/END and VERSION_COMPAT=104
+		[ "$j" -ge "$CAPITAL_DEACTIVATED_BEGIN" ] && [ "$j" -lt "$CAPITAL_DEACTIVATED_END" ] && VERSION_COMPAT=104		
+
+		# version 1.1.0 is compatible with TLV for capital letters
+		# Corresponds to sequence CAPITAL_ACTIVATED_BEGIN/END and VERSION_COMPAT=110
+		#
+		# we add PUNCT_MODE=0 to specifically check a capitalized text followed by a not-to-spell
+		# punctuation char; e.g. "Capital: " 
+		[ "$j" -ge "$CAPITAL_ACTIVATED_BEGIN" ] && [ "$j" -lt "$CAPITAL_ACTIVATED_END" ] && VERSION_COMPAT=110 && PUNCT_MODE=0
 		convertFile $j "${testLabel[$j]}" "$TMPFILE" $PUNCT_MODE $CAPS_MODE $VERSION_COMPAT
 		j=$((j+1))
 	done

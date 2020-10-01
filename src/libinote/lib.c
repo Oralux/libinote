@@ -276,9 +276,17 @@ static tlv_t *tlv_next(tlv_t *self, inote_type_t type) {
       header->length = 0;
       goto exit0;
     }
-    if ((type == header->type) && (header->type == INOTE_TYPE_TEXT)
+    // if applicable, use the previous tlv
+    if ((type == INOTE_TYPE_TEXT)
 	&& (header->length < TLV_VALUE_LENGTH_MAX-TLV_VALUE_LENGTH_THRESHOLD)) {
-      goto exit0;
+      switch (header->type) {
+      case INOTE_TYPE_TEXT:
+      case INOTE_TYPE_CAPITAL: // "Capital" followed by ":" (a punctuation char which does not have to be spelled)
+      case INOTE_TYPE_CAPITALS: // "CAPITAL" followed by ":"
+	goto exit0;
+      default:
+	break;
+      }
     }
   }  
 
