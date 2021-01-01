@@ -70,7 +70,14 @@ typedef struct {
   // backward_compatibility:
   // the TLV generated must be compatible with this version.
   version_t backward_compatibility;
-  bool capital_activated; // the INOTE_TYPE_CAPITAL(s) TLV can be generated
+  // with_feature_capital:
+  // if set to true, the current version implements management of capitalized words
+  bool with_feature_capital;
+  // capital_activated:
+  // If set to true the INOTE_TYPE_CAPITAL(s) TLV can be generated.
+  // This parameter is significant only if with_feature_capital equals
+  // true otherwise it mudt be ignored.
+  bool capital_activated; 
 } inote_t;
 
 typedef struct {
@@ -881,7 +888,9 @@ void *inote_create() {
       self->cd_to_char32[i] = ICONV_ERROR;
       self->cd_from_char32[i] = ICONV_ERROR;
     }
-    self->capital_activated = true;
+    self->capital_activated = false;
+    self->with_feature_capital = true;
+    dbg("capital deactivated");
   }
   return self;
 }
@@ -1104,15 +1113,41 @@ inote_error inote_set_compatibility(void *handle, int major, int minor, int patc
 
   self->backward_compatibility = (version_t){major, minor, patch};
 
-  self->capital_activated = (major > minimal_version.major)
+  self->with_feature_capital = (major > minimal_version.major)
     || ((major == minimal_version.major)
 	&& ((minor > minimal_version.minor)
 	    || ((minor == minimal_version.minor)
 		&& (patch >= minimal_version.patch))));
 
-  if (self->capital_activated)
-    dbg("capital activated\n");
+  self->capital_activated = false; // must be explicitly activated by inote_enable_capital()
+  dbg("capital deactivated");
   
+  if (self->with_feature_capital)
+    dbg("with_feature_capital");
+  
+ exit0:
+  dbg("LEAVE(%s)", inote_error_get_string(ret));  
+  return ret;
+}
+
+
+inote_error inote_enable_capital(void *handle, bool with_capital) {
+  dbg("ENTER with_capital:%d", with_capital);
+  inote_error ret = INOTE_OK;
+  inote_t *self;
+
+  if (!handle || ( (self=(inote_t*)handle)->magic != MAGIC)) {
+    ret = INOTE_ARGS_ERROR;
+    goto exit0;
+  }
+
+  if (self->with_feature_capital) {
+    self->capital_activated = with_capital;
+    dbg("capital %s", with_capital ? "activated" : "deactivated");
+  } else if (with_capital) {
+    ret = INOTE_ARGS_ERROR;
+  }
+
  exit0:
   dbg("LEAVE(%s)", inote_error_get_string(ret));  
   return ret;

@@ -32,7 +32,7 @@
 
 #define INOTE_VERSION_MAJOR 1
 #define INOTE_VERSION_MINOR 1
-#define INOTE_VERSION_PATCH 0
+#define INOTE_VERSION_PATCH 1
 
 typedef enum {
   INOTE_CHARSET_UNDEFINED = 0,
@@ -103,7 +103,7 @@ typedef struct {
   uint8_t *buffer; 
   size_t length; /**< data length in bytes */
   inote_charset_t charset;
-  uint8_t *end_of_buffer; /**< allocated buffer size */
+  uint8_t *end_of_buffer; /**< allocated buffer size (buffer + length <= end_of_buffer) */
 } inote_slice_t;
   
 typedef struct {
@@ -273,13 +273,24 @@ const char *inote_error_get_string(inote_error err);
    will be generated only if the version supplied is greater or equal
    to 1.1.0.
 
-   @param[in] handle  inote instance
+   @param handle  inote instance
    @param major  e.g. 1 for version 1.2.3
    @param minor  e.g. 2 for version 1.2.3
    @param major  e.g. 3 for version 1.2.3
    @return inote_error
 */
 inote_error inote_set_compatibility(void *handle, int major, int minor, int patch);
+
+/**
+   Enable TVL for capitalized words
+   
+   By default, no INOTE_TYPE_CAPITAL(S) TLV is generated.
+
+   @param handle  inote instance
+   @param with_capital  if set to true, enable TLV for capitalized words
+   @return inote_error
+*/
+inote_error inote_enable_capital(void *handle, bool with_capital);
 
 /** debug */
 void inoteDebugInit();

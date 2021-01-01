@@ -11,7 +11,6 @@ Usage:
  $NAME [options]
 
 Build libinote and tests.
-
 Options: 
 -c, --clean		   clean-up: delete the build directory and object files
 -d, --debug        compile with debug symbols 

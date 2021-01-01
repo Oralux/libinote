@@ -25,101 +25,172 @@ fi
 
 
 
+testSentence() {
+    T125="ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+    T126="éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+    T127="ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+    T256=${T127}${T127}éé
 
-T125="ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
-T126="éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
-T127="ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
-T256=${T127}${T127}éé
+    #unset testArray
+    i=0
 
-unset testArray
-i=0
+    # ---> 
+    echo "$i. BEGIN +CAPS -BEEP +PUNCT"
+    VERSION_COMPAT=-1
+    CAPS_MODE=1
+    unset CAPS_PREFIX
+    PUNCT_MODE=1
 
-testLabel[$i]="utf-8 text"
-testArray[$((i++))]="   Un éléphant"
+    # the order of tests is important (index used to named the corresponding report)
+    label="utf-8 text"
+    text="   Un éléphant"
+    convertFile $((i++))
 
-testLabel[$i]="utf-8 text"
-testArray[$((i++))]=",   Un éléphant"
+    label="utf-8 text"
+    text=",   Un éléphant"
+    convertFile $((i++))
 
-testLabel[$i]="utf-8 text + filtered annotation + tag + punctuation"
-testArray[$((i++))]="  \`gfa1 \`gfa2 \`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"
+    label="utf-8 text + filtered annotation + tag + punctuation"
+    text="  \`gfa1 \`gfa2 \`Pf2()? <speak>Un &lt;éléphant&gt; (1)</speak>"
+    convertFile $((i++))
 
-testLabel[$i]="utf-8 text + annotation"
-testArray[$((i++))]=" \`v1 Un \`v2 éléphant"
+    label="utf-8 text + annotation"
+    text=" \`v1 Un \`v2 éléphant"
+    convertFile $((i++))
 
-testLabel[$i]="1 tlv for 127 é (header=2 bytes + value=254 bytes)"
-testArray[$((i++))]=${T127}
+    label="1 tlv for 127 é (header=2 bytes + value=254 bytes)"
+    text=${T127}
+    convertFile $((i++))
 
-testLabel[$i]="2 tlv: 127 é + a"
-testArray[$((i++))]=${T127}a
+    label="2 tlv: 127 é + a"
+    text=${T127}a
+    convertFile $((i++))
 
-testLabel[$i]="1 tlv: a + 125 é"
-testArray[$((i++))]=a${T125}
+    label="1 tlv: a + 125 é"
+    text=a${T125}
+    convertFile $((i++))
 
-testLabel[$i]="2 tlv, last utf-8 splitted: a + 125 é + 4 bytes utf8 char 𪚥"
-testArray[$((i++))]=a${T125}𪚥
+    label="2 tlv, last utf-8 splitted: a + 125 é + 4 bytes utf8 char 𪚥"
+    text=a${T125}𪚥
+    convertFile $((i++))
 
-testLabel[$i]="1025 bytes: a + 512 é"
-testArray[$((i++))]=$(echo -n "a$T256$T256")
+    label="1025 bytes: a + 512 é"
+    text=$(echo -n "a$T256$T256")
+    convertFile $((i++))
 
-testLabel[$i]="6 bytes: é + 2 erroneous utf-8 bytes + é"
-testArray[$((i++))]=$(echo -en "é\xca\xfeé")
+    label="6 bytes: é + 2 erroneous utf-8 bytes + é"
+    text=$(echo -en "é\xca\xfeé")
+    convertFile $((i++))
 
-testLabel[$i]="256 bytes: 127 é + 2 erroneous bytes"
-testArray[$((i++))]=$(echo -en "${T127}\xca\xfe")
+    label="256 bytes: 127 é + 2 erroneous bytes"
+    text=$(echo -en "${T127}\xca\xfe")
+    convertFile $((i++))
 
-testLabel[$i]="257 bytes: a + 127 é + 2 erroneous bytes"
-testArray[$((i++))]=$(echo -en "a${T127}\xca\xfe")
+    label="257 bytes: a + 127 é + 2 erroneous bytes"
+    text=$(echo -en "a${T127}\xca\xfe")
+    convertFile $((i++))
 
-testLabel[$i]="utf-8 text + language switching annotation"
-testArray[$((i++))]="Un éléphant \`l0x12345678 One elephant"
+    label="utf-8 text + language switching annotation"
+    text="Un éléphant \`l0x12345678 One elephant"
+    convertFile $((i++))
 
-# ---> BEGIN CAPS TEST
-CAPITAL_BEGIN=$i
-testLabel[$i]="word with same capitalization #1"
-testArray[$((i++))]="CAPITAL LETTER"
+    # ---> 
+    echo "$i. BEGIN +CAPS +BEEP +PUNCT"
+    # default version
+    VERSION_COMPAT=-1
 
-testLabel[$i]="word with same capitalization #2"
-testArray[$((i++))]="capital Letter"
+    # enable TLV for capitalized word
+    CAPS_MODE=1
 
-testLabel[$i]="first word with capital letter and the remaining text as lower case #1"
-testArray[$((i++))]="Capital letter"
+    # prefix each capitalized word in the resulting text
+    CAPS_PREFIX="beep"
 
-testLabel[$i]="first word with capital letter and the remaining text as lower case #2"
-testArray[$((i++))]="CaPital letter"
+    # punctuation mode: ALL
+    PUNCT_MODE=1
 
-testLabel[$i]="first word all caps and the remaining text as lower case"
-testArray[$((i++))]="CAPITAL letter"
+    label="word with same capitalization #1"
+    text="CAPITAL LETTER"
+    convertFile $((i++))
 
-testLabel[$i]="text as lower case"
-testArray[$((i++))]="capital letter"
+    label="word with same capitalization #2"
+    text="capital Letter"
+    convertFile $((i++))
 
-# (2+3) + 250 + (1 + 1+1) = 256 + 2
-testLabel[$i]="2 tlv, last capital tag splitted #1: abc + 125 é + A"
-testArray[$((i++))]="abc${T125}A"
+    label="first word with capital letter and the remaining text as lower case #1"
+    text="Capital letter"
+    convertFile $((i++))
 
-# (2+2) + 250 + (1+1 +1) = 256 + 1
-testLabel[$i]="2 tlv + last capital tag splitted #2: ab + 125 é + A"
-testArray[$((i++))]="ab${T125}A"
-CAPITAL_END=$i
-# <--- END CAPS TESTS
-# ---> BEGIN CAPS DEACTIVATED TEST
-CAPITAL_DEACTIVATED_BEGIN=$i
-testLabel[$i]="capital deactivated; first word with capital letter and the remaining text as lower case #2"
-testArray[$((i++))]="CaPital letter"
-CAPITAL_DEACTIVATED_END=$i
-# <--- END CAPS DEACTIVATED TESTS
-# ---> BEGIN CAPS ACTIVATED TEST
-CAPITAL_ACTIVATED_BEGIN=$i
-testLabel[$i]="capital activated; first word with capital letter and the remaining text as lower case #2"
-testArray[$((i++))]="CaPital letter"
+    label="first word with capital letter and the remaining text as lower case #2"
+    text="CaPital letter"
+    convertFile $((i++))
 
-testLabel[$i]="word with capital letter followed by a not-to-spell punctuation char"
-testArray[$((i++))]="Voxin: "
+    label="first word all caps and the remaining text as lower case"
+    text="CAPITAL letter"
+    convertFile $((i++))
 
-testLabel[$i]="lower case word followed by a not-to-spell punctuation char"
-testArray[$((i++))]="voxin: "
-CAPITAL_ACTIVATED_END=$i
-# <--- END CAPS DEACTIVATED TESTS
+    label="text as lower case"
+    text="capital letter"
+    convertFile $((i++))
+
+    # (2+3) + 250 + (1 + 1+1) = 256 + 2
+    label="2 tlv, last capital tag splitted #1: abc + 125 é + A"
+    text="abc${T125}A"
+    convertFile $((i++))
+
+    # (2+2) + 250 + (1+1 +1) = 256 + 1
+    label="2 tlv + last capital tag splitted #2: ab + 125 é + A"
+    text="ab${T125}A"
+    convertFile $((i++))
+
+    # ---> 
+    echo "$i. BEGIN -CAPS +PUNCT V=104"
+    # compatible with libinote 1.0.4
+    VERSION_COMPAT=104
+    CAPS_MODE=0
+    PUNCT_MODE=1
+
+    label="capital deactivated; first word with capital letter and the remaining text as lower case #2"
+    text="CaPital letter"
+    convertFile $((i++))
+
+    # ---> 
+    echo "$i. BEGIN +CAPS -BEEP -PUNCT"
+    VERSION_COMPAT=-1
+    CAPS_MODE=1
+    unset CAPS_PREFIX
+    # punctuation mode: NONE
+    PUNCT_MODE=0
+
+    label="capital activated; first word with capital letter and the remaining text as lower case #2"
+    text="CaPital letter"
+    convertFile $((i++))
+
+    label="word with capital letter followed by a not-to-spell punctuation char"
+    text="Voxin: "
+    convertFile $((i++))
+
+    label="lower case word followed by a not-to-spell punctuation char"
+    text="voxin: "
+    convertFile $((i++))
+
+    # ---> 
+    echo "$i. BEGIN -CAPS -PUNCT"
+    VERSION_COMPAT=-1
+    CAPS_MODE=0
+    unset CAPS_PREFIX
+    # punctuation mode: NONE
+    PUNCT_MODE=0
+
+    label="word with capital letter between not-to-spell punctuation char"
+    text="(Voxin) "
+    convertFile $((i++))
+
+    label="lower case word between not-to-spell punctuation char"
+    text="(voxin) "
+    convertFile $((i++))
+}
+
+# <--- END CAPS ACTIVATED TESTS
 
 leave() {
 	echo "$1" && exit $2
@@ -137,39 +208,43 @@ convertText() {
 }
 
 convertFile() {
-	NUM=$1
-	LABEL=$2
-	FILE=$3
-	PUNCT_MODE=$4
-	local caps_mode=$5
-	local version_compat=$6
-	local caps_prefix=""
-	if [ -z "$QUIET" ]; then	
-		echo
-		echo "* $NUM. $LABEL"
-		echo "input:"
-		cat "$FILE"
-		echo
-	fi
-	
-	[ "$version_compat" != -1 ] && args="-v $version_compat"
-	./text2tlv -p $PUNCT_MODE -i "$FILE" -o "$FILE.tlv" $args
+    NUM=$1
 
-	if [ -z "$QUIET" ]; then	
-		echo "tlv:"
-		hexdump -Cv "$FILE.tlv"
-	fi
+    local args
+    local file=${TMPDIR}/test_$NUM
 
-	[ "$caps_mode" = 1 ] && caps_prefix="beep"
-	./tlv2text -i "$FILE.tlv" -o "$FILE.txt" -c "$caps_prefix"
-	if [ -z "$QUIET" ]; then	
-		echo "output:"
-		cat "$FILE.txt"
-	fi
+    echo -en "$text" > $file
+    #		rm -f "$file.tlv" "$file.txt"
+    
+    if [ -z "$QUIET" ]; then	
+	echo
+	echo "* $NUM. $label"
+	echo "input:"
+	cat "$file"
+	echo
+    fi
 
-	diff -q "$FILE.tlv" res/$(basename "$FILE.tlv") || leave "text $NUM. $LABEL (tlv): KO" 1
-	diff -q "$FILE.txt" res/$(basename "$FILE.txt") || leave "text $NUM. $LABEL (txt): KO" 1
-	echo "text $NUM: OK"
+    args="-p $PUNCT_MODE -i $file -o $file.tlv "
+    [ -n "$VERSION_COMPAT" ] && [ "$VERSION_COMPAT" != -1 ] && args="$args -v $VERSION_COMPAT"
+    [ -n "$CAPS_MODE" ] && [ "$CAPS_MODE" != 0 ] && args="$args -C"
+
+    ./text2tlv $args
+    
+    if [ -z "$QUIET" ]; then	
+	echo "tlv:"
+	hexdump -Cv "$file.tlv"
+    fi
+    
+    ./tlv2text -i "$file.tlv" -o "$file.txt" -c "$CAPS_PREFIX"
+    if [ -z "$QUIET" ]; then	
+	echo "output:"
+	cat "$file.txt"
+    fi
+    
+    diff -q "$file.tlv" res/$(basename "$file.tlv") || leave "text $NUM. $label (tlv): KO" 1
+    diff -q "$file.txt" res/$(basename "$file.txt") || leave "text $NUM. $label (txt): KO" 1
+    echo "text $NUM: OK"
+    rm -f "$file.tlv" "$file.txt"
 }
 
 
@@ -293,40 +368,43 @@ testCharset $file8 8-8 UTF-8:UTF-8 $file8
 testCharset $file1 1-8 ISO-8859-1:UTF-8 $file8
 testCharset $file8 8-1 UTF-8:ISO-8859-1 $file1
 
+testSentence
+
 # testCharset $file1_orig 1-1 ISO-8859-1:ISO-8859-1 $file1_orig
 # testCharset $file8_orig 8-8 UTF-8:UTF-8 $file8_orig
 # testCharset $file1_orig 1-8 ISO-8859-1:UTF-8 $file8_orig
 # testCharset $file8_orig 8-1 UTF-8:ISO-8859-1 $file1_orig
 
-if [ -n "$WITH_GDB" ]; then
-	TMPFILE=${TMPDIR}/test_last
-	echo -en "${testArray[-1]}" > $TMPFILE
-	gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -p $PUNCT_MODE -i '$TMPFILE' -o '$TMPFILE.tlv'" -x gdb_commands ./text2tlv
-#	gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -p $PUNCT_MODE -i '$TMPFILE' -o '$TMPFILE.tlv'" ./text2tlv
-else
-	j=0
-	for i in "${testArray[@]}"; do
-		TMPFILE=${TMPDIR}/test_$j
-		echo -en "$i" > $TMPFILE
-		#		rm -f "$FILE.tlv" "$FILE.txt"
-		CAPS_MODE=0
-		VERSION_COMPAT=-1
-		[ "$j" -ge "$CAPITAL_BEGIN" ] && [ "$j" -lt "$CAPITAL_END" ] && CAPS_MODE=1
+# if [ -n "$WITH_GDB" ]; then
+#     TMPFILE=${TMPDIR}/test_last
+#     echo -en "${testArray[-1]}" > $TMPFILE
+#     gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -p $PUNCT_MODE -i '$TMPFILE' -o '$TMPFILE.tlv'" -x gdb_commands ./text2tlv
+#else
+# #	gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -p $PUNCT_MODE -i '$TMPFILE' -o '$TMPFILE.tlv'" ./text2tlv
+# else
+# 	j=0
+# 	for i in "${testArray[@]}"; do
+# 		TMPFILE=${TMPDIR}/test_$j
+# 		echo -en "$i" > $TMPFILE
+# 		#		rm -f "$FILE.tlv" "$FILE.txt"
+# 		CAPS_MODE=0
+# 		VERSION_COMPAT=-1
+# 		[ "$j" -ge "$CAPITAL_BEGIN" ] && [ "$j" -lt "$CAPITAL_END" ] && CAPS_MODE=1
 
-		# version 1.0.4 is not compatible with the TLV for capital letters (from version 1.1.0)
-		# Corresponds to sequence CAPITAL_DEACTIVATED_BEGIN/END and VERSION_COMPAT=104
-		[ "$j" -ge "$CAPITAL_DEACTIVATED_BEGIN" ] && [ "$j" -lt "$CAPITAL_DEACTIVATED_END" ] && VERSION_COMPAT=104		
+# 		# version 1.0.4 is not compatible with the TLV for capital letters (from version 1.1.0)
+# 		# Corresponds to sequence WITHOUT_CAPITAL_FEATURE_BEGIN/END and VERSION_COMPAT=104
+# 		[ "$j" -ge "$WITHOUT_CAPITAL_FEATURE_BEGIN" ] && [ "$j" -lt "$WITHOUT_CAPITAL_FEATURE_END" ] && VERSION_COMPAT=104		
 
-		# version 1.1.0 is compatible with TLV for capital letters
-		# Corresponds to sequence CAPITAL_ACTIVATED_BEGIN/END and VERSION_COMPAT=110
-		#
-		# we add PUNCT_MODE=0 to specifically check a capitalized text followed by a not-to-spell
-		# punctuation char; e.g. "Capital: " 
-		[ "$j" -ge "$CAPITAL_ACTIVATED_BEGIN" ] && [ "$j" -lt "$CAPITAL_ACTIVATED_END" ] && VERSION_COMPAT=110 && PUNCT_MODE=0
-		convertFile $j "${testLabel[$j]}" "$TMPFILE" $PUNCT_MODE $CAPS_MODE $VERSION_COMPAT
-		j=$((j+1))
-	done
-fi
+# 		# version 1.1.0 is compatible with TLV for capital letters
+# 		# Corresponds to sequence CAPITAL_ACTIVATED_BEGIN/END and VERSION_COMPAT=110
+# 		#
+# 		# we add PUNCT_MODE=0 to specifically check a capitalized text followed by a not-to-spell
+# 		# punctuation char; e.g. "Capital: " 
+# 		[ "$j" -ge "$CAPITAL_ACTIVATED_BEGIN" ] && [ "$j" -lt "$CAPITAL_ACTIVATED_END" ] && VERSION_COMPAT=110 && PUNCT_MODE=0
+# 		convertFile $j "${testLabel[$j]}" "$TMPFILE" $PUNCT_MODE $CAPS_MODE $VERSION_COMPAT
+# 		j=$((j+1))
+# 	done
+#fi
 
 # cat /tmp/libinote.log.*
 

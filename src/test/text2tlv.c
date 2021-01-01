@@ -22,14 +22,15 @@ enum {
 
 void usage() {
   printf("\
-Usage: text2tlv [-p <punct_mode>] [-i inputfile | -t <text>] [-o outputfile]\n\
+Usage: text2tlv [-p <punct_mode>] [-i inputfile | -t <text>] [-o outputfile] [-C]\n\
 Convert a text to a type-length-value byte buffer\n\
   -i inputfile          read text from file\n\
   -o outputfile         write tlv to this file\n\
-  -p punct_mode         optional punctuation mode; value from 0 to 2 (see inote_punct_mode_t in inote.h)\n\
   -t text               text to convert to tlv\n\
   -c charset0:charset1  optional charsets: set0 = text charset, set1 = tlv charset. By Default: UTF-8.\n\
                         possible choices: ISO-8859-1, GBK, UCS-2, SJIS or UTF-8.\n\
+  -C                    optional enable TLV for capitalized words.\n\
+  -p punct_mode         optional punctuation mode; value from 0 to 2 (see inote_punct_mode_t in inote.h)\n\
   -v version            optional backward compatibility with this older version.\n\
                         e.g. -v 104 for version 1.0.4\n\
 \n\
@@ -77,6 +78,7 @@ int main(int argc, char **argv)
   inote_charset_t charset0 = INOTE_CHARSET_UTF_8;
   inote_charset_t charset1 = INOTE_CHARSET_UTF_8;
   int version_compat = -1;
+  bool with_capital = false;
   
   memset(&text, 0, sizeof(text));
   memset(&tlv_message, 0, sizeof(tlv_message));
@@ -85,7 +87,7 @@ int main(int argc, char **argv)
   text.buffer = text_buffer;
   *text.buffer = 0;
   
-  while ((opt = getopt(argc, argv, "c:i:o:p:t:v:")) != -1) {
+  while ((opt = getopt(argc, argv, "c:Ci:o:p:t:v:")) != -1) {
     switch (opt) {
     case 'c': {
       char *x = strchr(optarg, ':');
@@ -97,6 +99,9 @@ int main(int argc, char **argv)
       charset0 = getCharset(optarg);
       charset1 = getCharset(x+1);
     }
+      break;
+    case 'C':
+      with_capital = true;
       break;
     case 'i':
       if (fdi)
@@ -160,6 +165,9 @@ int main(int argc, char **argv)
     minor = (version_compat%100)/10;
     patch = version_compat%10;
     inote_set_compatibility(handle, major, minor, patch);
+  }
+  if (with_capital) {
+    inote_enable_capital(handle, with_capital);
   }
   if (!fdi) {
     ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
