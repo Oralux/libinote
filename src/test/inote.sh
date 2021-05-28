@@ -11,6 +11,8 @@ if [ "$1" = "-g" ]; then
 	WITH_GDB=1
 fi
 
+INOTE_INCOMPLETE_MULTIBYTE=4
+
 testFileUrl="http://abu.cnam.fr/cgi-bin/donner_unformated?nddp1"
 file1_orig=nddp1.orig.txt
 file8_orig=nddp8${file1_orig#nddp1}
@@ -257,12 +259,22 @@ testCharset() {
 	SEP=$2
 	CHARSETS=$3
 	FILE_EXPECTED=$4
+	ERROR=$5
 	# uncomment gdb if needed
 	if [ -n "$WITH_GDB" ]; then	
 		gdb -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -c $CHARSETS -i $FILE -o $FILE.$SEP.tlv" ./text2tlv
 		exit 0
 	fi
 	./text2tlv       -p 1 -c $CHARSETS -i "$FILE" -o "$FILE.$SEP.tlv"
+	local err=$?
+	if [ -n "$ERROR" ]; then
+	    if [ "$err" = "$ERROR" ]; then
+		echo "Expected error: OK"
+		return
+	    else
+		leave "Expected error: KO" 1
+	    fi
+	fi
 	./tlv2text -i "$FILE.$SEP.tlv" -o "$FILE.$SEP.txt"
 	diff -q $FILE_EXPECTED $FILE.$SEP.txt
 	if [ $? != 0 ]; then
@@ -276,6 +288,23 @@ testCharset() {
 echo
 echo "libinote: starting tests"
 echo
+
+# --> checking erroneous entries
+# UTF8
+for i in a b c d e; do
+    testCharset utf8_err6$i.txt 8-1 UTF-8:ISO-8859-1 res/utf8_err6$i.txt.8-1.txt
+done
+
+## Expected error: INOTE_INCOMPLETE_MULTIBYTE
+testCharset utf8_err1.txt 8-1 UTF-8:ISO-8859-1 res/utf8_err1.txt $INOTE_INCOMPLETE_MULTIBYTE
+
+# LATIN1
+for i in a b c d e; do
+    testCharset latin1_err6$i.txt 1-8 ISO-8859-1:ISO-8859-1 res/latin1_err6$i.txt.1-8.txt
+done
+
+testCharset latin1_err1.txt 1-8 ISO-8859-1:ISO-8859-1 res/latin1_err1.txt.1-8.txt
+# <--
 
 TMPDIR=$(mktemp -d)
 filea8=${TMPDIR}/test_utf8_symbol

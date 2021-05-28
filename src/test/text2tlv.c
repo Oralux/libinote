@@ -210,12 +210,16 @@ int main(int argc, char **argv)
       text.end_of_buffer = text.buffer + len;	  
       ret = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
       switch (ret) {
-      case INOTE_INVALID_MULTIBYTE: {
+      case INOTE_INVALID_MULTIBYTE: { // attempt to reread the erroneous portion after wiping the problematic byte
+	// 123456  text.length = 6
+	// x       text_left = 6 (x: invalid multibyte)
 	int ret2;
-	text.length -= text_left;
-	text.buffer[text.length] = ' '; // ignore this byte
-	text.length++;
-	fseek(fdi, -text_left+1, SEEK_CUR); // +1 for the space character
+	int index = text.length - text_left; // index = 0
+	text.buffer[index] = ' '; // ignore this byte
+	text.length = index + 1;
+	volatile long pos = ftell(fdi);
+	fseek(fdi, -text_left+1, SEEK_CUR); // +1 : next read after the ignored char
+	pos = ftell(fdi);
 	ret2 = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
 	loop = (!ret2);
       }
@@ -223,7 +227,11 @@ int main(int argc, char **argv)
       case INOTE_INCOMPLETE_MULTIBYTE: {
 	int ret2;
 	text.length -= text_left;
+	if (!text.length)
+	  break;
+	volatile long pos = ftell(fdi);
 	fseek(fdi, -text_left, SEEK_CUR);
+	pos = ftell(fdi);
 	ret2 = inote_convert_text_to_tlv(handle, &text, &state, &tlv_message, &text_left);
 	loop = (!ret2);
       }
