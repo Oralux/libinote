@@ -484,6 +484,8 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
 
   inoteDebugDump("t=", (uint8_t*)t, 20);
 
+  dbg("First: %d, capital_activated=%d, upper=%d, (self=%p)", first, self->capital_activated, iswctype(*t, upper), self);
+  
   if (first == INOTE_TYPE_TEXT) {
     if (self->capital_activated && iswctype(*t, upper)) {
       first = INOTE_TYPE_CAPITAL;
@@ -892,10 +894,12 @@ void *inote_create() {
     self->with_feature_capital = true;
     dbg("capital deactivated");
   }
+  dbg("self=%p", self);
   return self;
 }
 
 void inote_delete(void *handle) {
+  dbg("ENTER self=%p", (inote_t*)handle);
   ENTER();
   inote_t *self;
   if (!handle)
@@ -918,7 +922,7 @@ void inote_delete(void *handle) {
 }
 
 inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, inote_state_t *state, inote_slice_t *tlv_message, size_t *text_left) {
-  ENTER();
+  dbg("ENTER self=%p", (inote_t*)handle);
   inote_error ret = INOTE_OK;
   inote_slice_t output;
   char *inbuf;
@@ -1101,7 +1105,7 @@ inote_error inote_slice_get_type(const inote_slice_t *tlv_message, inote_type_t 
 }
 
 inote_error inote_set_compatibility(void *handle, int major, int minor, int patch) {
-  dbg("ENTER major:%d, minor:%d, patch:%d", major, minor, patch);
+  dbg("ENTER major:%d, minor:%d, patch:%d, self=%p", major, minor, patch, (inote_t*)handle);
   inote_error ret = INOTE_OK;
   inote_t *self;
   version_t minimal_version = VERSION_COMPAT_CAPITAL;
@@ -1130,9 +1134,8 @@ inote_error inote_set_compatibility(void *handle, int major, int minor, int patc
   return ret;
 }
 
-
 inote_error inote_enable_capital(void *handle, bool with_capital) {
-  dbg("ENTER with_capital:%d", with_capital);
+  dbg("ENTER with_capital:%d, self=%p", with_capital, (inote_t*)handle);
   inote_error ret = INOTE_OK;
   inote_t *self;
 
