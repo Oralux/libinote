@@ -22,7 +22,7 @@ enum {
 
 void usage() {
   printf("\
-Usage: text2tlv [-p <punct_mode>] [-i inputfile | -t <text>] [-o outputfile] [-C]\n\
+Usage: text2tlv [-p <punct_mode>] [-s] [-i inputfile | -t <text>] [-o outputfile] [-C]\n\
 Convert a text to a type-length-value byte buffer\n\
   -i inputfile          read text from file\n\
   -o outputfile         write tlv to this file\n\
@@ -31,6 +31,7 @@ Convert a text to a type-length-value byte buffer\n\
                         possible choices: ISO-8859-1, GBK, UCS-2, SJIS or UTF-8.\n\
   -C                    optional enable TLV for capitalized words.\n\
   -p punct_mode         optional punctuation mode; value from 0 to 2 (see inote_punct_mode_t in inote.h)\n\
+  -s ssml               optional activate ssml mode\n\
   -v version            optional backward compatibility with this older version.\n\
                         e.g. -v 104 for version 1.0.4\n\
 \n\
@@ -79,6 +80,7 @@ int main(int argc, char **argv)
   inote_charset_t charset1 = INOTE_CHARSET_UTF_8;
   int version_compat = -1;
   bool with_capital = false;
+  bool with_ssml = false;
   
   memset(&text, 0, sizeof(text));
   memset(&tlv_message, 0, sizeof(tlv_message));
@@ -87,7 +89,7 @@ int main(int argc, char **argv)
   text.buffer = text_buffer;
   *text.buffer = 0;
   
-  while ((opt = getopt(argc, argv, "c:Ci:o:p:t:v:")) != -1) {
+  while ((opt = getopt(argc, argv, "c:Ci:o:p:st:v:")) != -1) {
     switch (opt) {
     case 'c': {
       char *x = strchr(optarg, ':');
@@ -122,6 +124,9 @@ int main(int argc, char **argv)
     case 'p':
       punct_mode = atoi(optarg);
       break;
+    case 's':
+      with_ssml = true;
+      break;
     case 't':
       strncpy(text.buffer, optarg, TEXT_LENGTH_MAX);
       text.length = strlen(text.buffer);
@@ -151,7 +156,7 @@ int main(int argc, char **argv)
   state.expected_lang[0] = ENGLISH;
   state.expected_lang[1] = FRENCH;
   state.max_expected_lang = MAX_LANG;
-  //  state.ssml = 0;
+  state.ssml = with_ssml ? 1:0;
   state.annotation = 1;
     
   tlv_message.buffer = tlv_message_buffer;

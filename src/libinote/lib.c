@@ -842,7 +842,9 @@ static inote_error inote_get_type_length_value(inote_t *self, const inote_slice_
   tmax = segment_get_max(&segment);  
   while (((t=segment_get_buffer(&segment)) < tmax) && t) {
     ret = INOTE_UNPROCESSED;
-    if (iswpunct(*t)) {
+    // TODO: parsing a fragmented pattern (tag, annotation, entity)
+    // // if (iswpunct(*t)) {
+    if (iswpunct(*t) && (text->length > sizeof(*t))) { 
       switch(*t) {
       case U'<':
 	ret = inote_push_tag(self, &segment, state, &tlv);
@@ -967,6 +969,8 @@ inote_error inote_convert_text_to_tlv(void *handle, const inote_slice_t *text, i
 
   DBG_PRINT_SLICE(text);
   DBG_PRINT_STATE(state);
+
+  dbg("text=%s", text->buffer)
   
   output.buffer = (uint8_t*)self->char32_buf;
   output.length = 0;

@@ -198,6 +198,25 @@ leave() {
 	echo "$1" && exit $2
 }
 
+testSSML() {
+    local num=$1
+    local text="$2"
+    local punct_mode="$3"
+    local tlv=$4
+    local res=$(mktemp)
+
+    echo "* SSML#$num. text='$text', punc:$punct_mode"
+
+    if [ -n "$WITH_GDB" ]; then
+	gdb -ex "b inote_get_type_length_value" -ex "b inote_push_text" -ex "b inote_convert_text_to_tlv" -ex "set args -s -p $punct_mode -t '$text' -o $res" ./text2tlv
+	exit 0
+    fi
+
+    ./text2tlv -s -p $punct_mode -t "$text" -o "$res"
+    diff -q "$tlv" "$res" || leave "SSML $num: KO" 1
+    rm "$res"
+}
+
 convertText() {
 	NUM=$1
 	LABEL=$2
@@ -288,6 +307,18 @@ testCharset() {
 echo
 echo "libinote: starting tests"
 echo
+
+# --> checking ssml mode
+
+numSSML=1
+TEXT="<speak>hello"
+punctMode=0
+testSSML "$numSSML" "$TEXT" "$punctMode" res/ssml.1.txt
+
+numSSML=$((++numSSML))
+TEXT="<"
+punctMode=0
+testSSML "$numSSML" "$TEXT" "$punctMode" res/ssml.2.txt
 
 # --> checking erroneous entries
 # UTF8
