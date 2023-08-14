@@ -320,6 +320,11 @@ TEXT="<"
 punctMode=0
 testSSML "$numSSML" "$TEXT" "$punctMode" res/ssml.2.txt
 
+numSSML=$((++numSSML))
+TEXT="in <m"
+punctMode=0
+testSSML "$numSSML" "$TEXT" "$punctMode" res/ssml.3.txt
+
 # --> checking erroneous entries
 # UTF8
 for i in a b c d e; do

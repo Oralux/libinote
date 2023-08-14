@@ -638,10 +638,11 @@ static inote_error inote_push_text(inote_t *self, inote_type_t first, segment_t 
 }
 
 /* TODO: ssml parser */
-/* Currently any tag is simply filtered. */
+/* Currently any complete tag is simply filtered */
 static inote_error inote_push_tag(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
   ENTER();
   char32_t *t, *tmax;
+  int ret = INOTE_UNPROCESSED;
 
   if (!state->ssml)
     return INOTE_UNPROCESSED;
@@ -657,8 +658,12 @@ static inote_error inote_push_tag(inote_t *self, segment_t *segment, inote_state
     t++;
   }
 
-  segment_erase(segment, (uint8_t*)(t+1));
-  return INOTE_OK;
+  if (*t == U'>') {
+    segment_erase(segment, (uint8_t*)(t+1));
+    ret = INOTE_OK;
+  }
+  
+  return ret;
 }
 
 static inote_error inote_push_punct(inote_t *self, segment_t *segment, inote_state_t *state, tlv_t *tlv) {
@@ -843,8 +848,7 @@ static inote_error inote_get_type_length_value(inote_t *self, const inote_slice_
   while (((t=segment_get_buffer(&segment)) < tmax) && t) {
     ret = INOTE_UNPROCESSED;
     // TODO: parsing a fragmented pattern (tag, annotation, entity)
-    // // if (iswpunct(*t)) {
-    if (iswpunct(*t) && (text->length > sizeof(*t))) { 
+    if (iswpunct(*t)) { 
       switch(*t) {
       case U'<':
 	ret = inote_push_tag(self, &segment, state, &tlv);
